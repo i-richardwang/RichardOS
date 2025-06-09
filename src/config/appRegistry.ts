@@ -2,14 +2,14 @@ import { TextEditApp } from "@/apps/textedit";
 import { InternetExplorerApp } from "@/apps/internet-explorer";
 import { ChatsApp } from "@/apps/chats";
 import ControlPanelsApp from "@/apps/control-panels";
-import { MinesweeperApp } from "@/apps/minesweeper";
+// import { MinesweeperApp } from "@/apps/minesweeper";
 import { SoundboardApp } from "@/apps/soundboard";
 import { FinderApp } from "@/apps/finder";
 import { PaintApp } from "@/apps/paint";
 import { VideosApp } from "@/apps/videos";
-import { PcApp } from "@/apps/pc";
+// import { PcApp } from "@/apps/pc";
 import { PhotoBoothApp } from "@/apps/photo-booth";
-import { SynthApp } from "@/apps/synth";
+// import { SynthApp } from "@/apps/synth";
 import { IpodApp } from "@/apps/ipod";
 import { TerminalApp } from "@/apps/terminal";
 import { appIds } from "./appIds";
@@ -95,14 +95,14 @@ export const appRegistry = {
       maxSize: { width: 644, height: 510 },
     } as WindowConstraints,
   },
-  [MinesweeperApp.id]: {
-    ...MinesweeperApp,
-    windowConfig: {
-      defaultSize: { width: 305, height: 400 },
-      minSize: { width: 305, height: 400 },
-      maxSize: { width: 305, height: 400 },
-    } as WindowConstraints,
-  },
+  // [MinesweeperApp.id]: {
+  //   ...MinesweeperApp,
+  //   windowConfig: {
+  //     defaultSize: { width: 305, height: 400 },
+  //     minSize: { width: 305, height: 400 },
+  //     maxSize: { width: 305, height: 400 },
+  //   } as WindowConstraints,
+  // },
   [VideosApp.id]: {
     ...(VideosApp as BaseApp<VideosInitialData>),
     windowConfig: {
@@ -117,21 +117,21 @@ export const appRegistry = {
       minSize: { width: 300, height: 480 },
     } as WindowConstraints,
   },
-  [SynthApp.id]: {
-    ...SynthApp,
-    windowConfig: {
-      defaultSize: { width: 720, height: 400 },
-      minSize: { width: 720, height: 290 },
-    } as WindowConstraints,
-  },
-  [PcApp.id]: {
-    ...PcApp,
-    windowConfig: {
-      defaultSize: { width: 645, height: 511 },
-      minSize: { width: 645, height: 511 },
-      maxSize: { width: 645, height: 511 },
-    } as WindowConstraints,
-  },
+  // [SynthApp.id]: {
+  //   ...SynthApp,
+  //   windowConfig: {
+  //     defaultSize: { width: 720, height: 400 },
+  //     minSize: { width: 720, height: 290 },
+  //   } as WindowConstraints,
+  // },
+  // [PcApp.id]: {
+  //   ...PcApp,
+  //   windowConfig: {
+  //     defaultSize: { width: 645, height: 511 },
+  //     minSize: { width: 645, height: 511 },
+  //     maxSize: { width: 645, height: 511 },
+  //   } as WindowConstraints,
+  // },
   [TerminalApp.id]: {
     ...TerminalApp,
     windowConfig: {
