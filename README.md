@@ -1,8 +1,14 @@
-# ryOS — A web-based agentic AI OS, made with Cursor
+# Richard OS — Interactive OS-style Personal Portfolio Website
 
-A modern web-based desktop environment inspired by classic macOS, built with a cutting-edge web stack and AI. 
-Features multiple built-in applications, a familiar desktop interface, and a system context-aware AI agent. 
+An OS-style personal portfolio website inspired by classic macOS, built with a cutting-edge web stack and AI. 
+Features multiple built-in applications, a familiar desktop interface, and an AI assistant. 
 Works on all devices—including mobile, tablet, and desktop.
+
+## About This Project
+
+Richard OS is a personal portfolio website that provides an authentic operating system experience. Based on the open-source [ryOS project](https://github.com/ryokun6/ryos), this customized version serves as an interactive showcase for personal projects, skills, and experiences.
+
+**Acknowledgments**: This project is built upon the excellent work of the ryOS team. Special thanks to the original developers for creating such an innovative platform. Original project: https://github.com/ryokun6/ryos
 
 ## Features
 
@@ -16,7 +22,7 @@ Works on all devices—including mobile, tablet, and desktop.
 - Customizable wallpapers (photos, patterns, or videos)
 - System-wide sampled and synthesizer sound effects
 - System-wide UI, Chats, and Terminal sounds
-- System-wide Ryo AI, with tool calls and context of running applications
+- System-wide AI assistant with tool calls and context of running applications
 - Virtual file system with local storage persistence and one-click Backup / Restore
 
 ### Built-in Applications
@@ -71,13 +77,13 @@ Works on all devices—including mobile, tablet, and desktop.
   - AI reimagines pre-1996 sites and generates futuristic designs
   - Save favorites by year and share time-travel links
 - **Chats**: AI-powered chat with speech & tool calling
-  - Natural conversation with Ryo AI
-  - Join public chat rooms with @ryo mentions
+  - Natural conversation with AI assistant
+  - Join public chat rooms with @mention capabilities
   - Push-to-talk voice messages with real-time transcription
   - Text-to-speech for AI responses with word highlighting
   - Control apps and edit documents via chat commands
   - Nudge system (👋) with context-aware responses
-  - ryOS FM DJ mode - when music plays, Ryo becomes a radio DJ
+  - DJ mode - when music plays, AI becomes a radio DJ
   - Tool calling capabilities for system integration
   - Save transcript to Markdown
   - Speech synthesis with volume controls
@@ -94,7 +100,7 @@ Works on all devices—including mobile, tablet, and desktop.
 - **Terminal**: Unix-like CLI with built-in AI
   - Familiar commands (ls, cd, cat, touch, vim, edit, …)
   - ↑ / ↓ history & auto-completion
-  - "ryo <prompt>" to chat with AI assistant
+  - Chat with AI assistant directly in terminal
   - Open documents in TextEdit or Vim straight from prompt
   - Toggle distinctive Terminal sounds in View ▸ Sounds
 - **iPod**: 1st-generation iPod-style music player
@@ -168,3 +174,7 @@ This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE)
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Credits
+
+Built upon the open-source [ryOS project](https://github.com/ryokun6/ryos). Thanks to all the original contributors who made this amazing foundation possible.

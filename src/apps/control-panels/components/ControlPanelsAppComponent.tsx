@@ -506,7 +506,7 @@ export function ControlPanelsAppComponent({
         .split("T")
         .join("-")
         .slice(0, -5);
-      a.download = `ryOS-backup-${timestamp}.gz`;
+      a.download = `RichardOS-backup-${timestamp}.gz`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1402,7 +1402,7 @@ export function ControlPanelsAppComponent({
                   </Button>
                   <p className="text-[11px] text-gray-600 font-geneva-12">
                     This will clear all saved settings and restore default
-                    states.
+                    states. Richard OS will restart after reset.
                   </p>
                 </div>
 
@@ -1417,8 +1417,8 @@ export function ControlPanelsAppComponent({
                     Format File System
                   </Button>
                   <p className="text-[11px] text-gray-600 font-geneva-12">
-                    This will clear all files (except sample docs), images, and
-                    custom wallpapers. ryOS will restart after format.
+                    This will clear all files (except sample documents), images, and
+                    custom wallpapers. Richard OS will restart after format.
                   </p>
                 </div>
 
@@ -1627,14 +1627,14 @@ export function ControlPanelsAppComponent({
           onOpenChange={setIsConfirmResetOpen}
           onConfirm={handleConfirmReset}
           title="Reset All Settings"
-          description="Are you sure you want to reset all settings? This will clear all saved settings and restore default states. ryOS will restart after reset."
+          description="Are you sure you want to reset all settings? This will clear all saved settings and restore default states. Richard OS will restart after reset."
         />
         <ConfirmDialog
           isOpen={isConfirmFormatOpen}
           onOpenChange={setIsConfirmFormatOpen}
           onConfirm={handleConfirmFormat}
           title="Format File System"
-          description="Are you sure you want to format the file system? This will permanently delete all documents (except sample documents), images, and custom wallpapers. ryOS will restart after format."
+          description="Are you sure you want to format the file system? This will permanently delete all documents (except sample documents), images, and custom wallpapers. Richard OS will restart after format."
         />
       </WindowFrame>
     </>

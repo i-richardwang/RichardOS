@@ -66,7 +66,7 @@ const CURRENT_PROJECTS_STORE_VERSION = 1;
 
 export const useProjectsStore = create<ProjectsState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       ...initialProjectsData,
 
       setSelectedProject: (project) => set({ selectedProject: project }),

@@ -3,12 +3,17 @@ description:
 globs: 
 alwaysApply: true
 ---
-# ryOS General Rules
+# General Rules
+
+## Project Info
+- Project name: `Richard OS`
+- Package manager: `bun`
+
+# Richard OS General Rules
 
 ## Environment
 - Project: `react`
 - Framework: `tailwindcss`, `shadcn`, `vite`
-- Package Manager: `bun`
 - Bundler: `bunx`
 
 ## General folder structure

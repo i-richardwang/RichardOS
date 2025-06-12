@@ -57,7 +57,7 @@ export function AboutFinderDialog({
       <DialogContent className="bg-system7-window-bg border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,0.5)] max-w-[400px] focus:outline-none">
         <DialogHeader>
           <DialogTitle className="font-normal text-[16px]">About This Computer</DialogTitle>
-          <DialogDescription className="sr-only">Information about ryOS on this computer</DialogDescription>
+          <DialogDescription className="sr-only">Information about Richard OS on this computer</DialogDescription>
         </DialogHeader>
 
         <div className="flex">
@@ -70,7 +70,7 @@ export function AboutFinderDialog({
                   alt="Happy Mac"
                   className="w-10 h-10 mb-0 [image-rendering:pixelated]"
                 />
-                <div className="font-apple-garamond text-xl">ryOS 8.2</div>
+                <div className="font-apple-garamond text-xl">Richard OS 8.2</div>
               </div>
 
               <div className="space-y-4 font-geneva-12 text-[10px]">
@@ -81,7 +81,7 @@ export function AboutFinderDialog({
                     Largest Unused Block: {(32 - totalUsedMemory).toFixed(1)}MB
                   </div>
                   <div className="text-[10px] text-gray-500  mt-2  font-geneva-12 text-[10px]">
-                    © Ryo Lu. 1992-{new Date().getFullYear()}
+                    © Richard Wang. 1992-{new Date().getFullYear()}
                   </div>
                 </div>
               </div>

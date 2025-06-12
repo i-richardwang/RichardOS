@@ -639,7 +639,7 @@ export function ChatsAppComponent({
           }}
           onSubmit={submitUsernameDialog}
           title="Set Username"
-          description="Set your ryOS username to continue chatting"
+          description="Set your Richard OS username to continue chatting"
           value={newUsername}
           onChange={(value) => {
             setNewUsername(value);

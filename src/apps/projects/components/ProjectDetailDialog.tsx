@@ -1,10 +1,9 @@
-import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Project } from "@/stores/useProjectsStore";
 import { ExternalLink, Github, Code2 } from "lucide-react";
-import { htmlToMarkdown, markdownToHtml } from "@/utils/markdown";
+import { markdownToHtml } from "@/utils/markdown";
 
 interface ProjectDetailDialogProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 # Agent Guidelines
 
-This project is **ryOS** – a web-based AI desktop environment built with React, Tailwind CSS, shadcn, Vite and Bun. Use these notes when working in this repository.
+This project is **Richard OS** – an interactive OS-style personal portfolio website built with React, Tailwind CSS, shadcn, Vite and Bun. Use these notes when working in this repository.
 
 ## Environment
 - Install dependencies with Bun. If Bun is not installed use:
@@ -38,3 +38,4 @@ This project is **ryOS** – a web-based AI desktop environment built with React
 - Pending project tasks are tracked in `.cursor/project-spec-todos.md`.
 - The README lists detailed features for each built‑in application.
 - Contributions are welcome via pull requests.
+- Source code: https://github.com/i-richardwang/RichardOS

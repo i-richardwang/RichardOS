@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { AppProps } from "@/apps/base/types";
 import { WindowFrame } from "@/components/layout/WindowFrame";
 import { ProjectsMenuBar } from "./ProjectsMenuBar";
@@ -7,9 +7,7 @@ import { HelpDialog } from "@/components/dialogs/HelpDialog";
 import { AboutDialog } from "@/components/dialogs/AboutDialog";
 import { helpItems, appMetadata } from "../index";
 import { useProjectsStore, type Project } from "@/stores/useProjectsStore";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Github, Code2, Star } from "lucide-react";
+import { Code2, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Project Card Component - Classic Mac OS style, clickable

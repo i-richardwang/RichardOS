@@ -2352,7 +2352,7 @@ assistant
             id: "system",
             role: "system",
             content:
-              "You are a coding assistant running in the terminal app on ryOS.",
+              "You are a coding assistant running in the terminal app on Richard OS.",
           },
         ]);
 
@@ -2535,7 +2535,7 @@ assistant
           id: "system",
           role: "system",
           content:
-            "You are a coding assistant running in the terminal app on ryOS.",
+            "You are a coding assistant running in the terminal app on Richard OS.",
         },
       ]);
 
@@ -2569,7 +2569,7 @@ assistant
           id: "system",
           role: "system",
           content:
-            "You are a coding assistant running in the terminal app on ryOS.",
+            "You are a coding assistant running in the terminal app on Richard OS.",
         },
       ]);
 
@@ -3375,10 +3375,10 @@ assistant
             name: "Terminal",
             version: "1.0",
             creator: {
-              name: "Ryo",
-              url: "https://github.com/ryokun6/ryos",
+              name: "Richard Wang",
+              url: "https://github.com/i-richardwang/RichardOS",
             },
-            github: "https://github.com/ryokun6/ryos",
+            github: "https://github.com/i-richardwang/RichardOS",
             icon: "/icons/terminal.png",
           }
         }
