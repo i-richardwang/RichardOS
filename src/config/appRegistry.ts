@@ -13,6 +13,7 @@ import { PhotoBoothApp } from "@/apps/photo-booth";
 import { IpodApp } from "@/apps/ipod";
 import { TerminalApp } from "@/apps/terminal";
 import { ProjectsApp } from "@/apps/projects";
+import { BlogApp } from "@/apps/blog";
 import { appIds } from "./appIds";
 import type {
   BaseApp,
@@ -153,6 +154,13 @@ export const appRegistry = {
     windowConfig: {
       defaultSize: { width: 800, height: 600 },
       minSize: { width: 600, height: 400 },
+    } as WindowConstraints,
+  },
+  [BlogApp.id]: {
+    ...BlogApp,
+    windowConfig: {
+      defaultSize: { width: 900, height: 650 },
+      minSize: { width: 700, height: 500 },
     } as WindowConstraints,
   },
 } as const;

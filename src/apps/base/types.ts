@@ -35,7 +35,8 @@ export interface BaseApp<TInitialData = unknown> {
     | "synth"
     | "ipod"
     | "terminal"
-    | "projects";
+    | "projects"
+    | "blog";
   name: string;
   icon: string | { type: "image"; src: string };
   description: string;

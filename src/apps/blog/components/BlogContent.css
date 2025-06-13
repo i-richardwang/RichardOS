@@ -1,0 +1,209 @@
+/* Blog content styles - 简化版本 */
+.blog-content {
+  color: #1f2937;
+  line-height: 1.7;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 标题样式 */
+.blog-content h1,
+.blog-content h2,
+.blog-content h3,
+.blog-content h4,
+.blog-content h5,
+.blog-content h6 {
+  font-family: var(--font-geneva-12);
+  color: #111827;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.blog-content h1 { font-size: 24px; }
+.blog-content h2 { font-size: 20px; }
+.blog-content h3 { font-size: 18px; }
+.blog-content h4 { font-size: 16px; }
+.blog-content h5,
+.blog-content h6 { font-size: 14px; }
+
+/* 段落和文本 */
+.blog-content p {
+  margin: 16px 0;
+  line-height: 1.7;
+}
+
+/* 图片样式 */
+.blog-content img {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 6px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  object-fit: contain;
+}
+
+/* 链接样式 */
+.blog-content a {
+  color: #2563eb !important;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.blog-content a:hover {
+  color: #1d4ed8 !important;
+}
+
+/* 列表样式 */
+.blog-content ul,
+.blog-content ol {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.blog-content li {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+/* 引用样式 */
+.blog-content blockquote {
+  margin: 20px 0;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-left: 4px solid #64748b;
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+}
+
+/* 代码样式 */
+.blog-content code {
+  background: #f1f5f9 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 11px !important;
+  color: #475569 !important;
+  white-space: pre-wrap !important;
+}
+
+.blog-content pre {
+  background: #f1f5f9 !important;
+  padding: 16px !important;
+  border-radius: 8px !important;
+  overflow-x: auto !important;
+  margin: 16px 0 !important;
+  border: 1px solid #e2e8f0;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  white-space: pre !important;
+  line-height: 1.4 !important;
+}
+
+.blog-content pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  white-space: pre !important;
+  display: block !important;
+}
+
+/* 分隔线 */
+.blog-content hr {
+  margin: 24px 0 !important;
+  border: none !important;
+  height: 1px !important;
+  background: #e5e7eb !important;
+}
+
+/* 表格样式 */
+.blog-content table {
+  width: 100%;
+  margin: 20px 0;
+  border-collapse: collapse;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.blog-content th,
+.blog-content td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.blog-content th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.blog-content tr:last-child td {
+  border-bottom: none;
+}
+
+/* WordPress 块样式 */
+.blog-content .wp-block-image,
+.blog-content .wp-block-gallery {
+  margin: 20px 0;
+}
+
+.blog-content .wp-block-quote {
+  margin: 20px 0;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-left: 4px solid #64748b;
+}
+
+.blog-content .wp-block-code {
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  white-space: pre !important;
+}
+
+.blog-content .wp-block-code pre {
+  white-space: pre !important;
+  overflow-x: auto !important;
+}
+
+.blog-content .wp-block-code code {
+  white-space: pre !important;
+}
+
+/* 嵌入内容 */
+.blog-content iframe,
+.blog-content embed,
+.blog-content object {
+  max-width: 100% !important;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+/* 对齐样式 */
+.blog-content .aligncenter {
+  text-align: center;
+  margin: 20px auto;
+}
+
+.blog-content .alignleft {
+  float: left;
+  margin: 0 20px 20px 0;
+}
+
+.blog-content .alignright {
+  float: right;
+  margin: 0 0 20px 20px;
+}
+
+/* 通用元素重置 */
+.blog-content *,
+.blog-content *::before,
+.blog-content *::after {
+  box-sizing: border-box;
+} 
