@@ -39,9 +39,9 @@ export function ProjectDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-system7-window-bg border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,0.5)] max-w-xl max-h-[90vh] flex flex-col gap-1">
+      <DialogContent className="bg-system7-window-bg border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,0.5)] max-w-xl max-h-[90vh] flex flex-col gap-1 w-[calc(100%-16px)] sm:w-full">
         <DialogHeader>
-          <DialogTitle className="font-geneva-12 text-[16px] font-bold">
+          <DialogTitle className="font-normal text-[16px]">
             {project.title}
           </DialogTitle>
           <DialogDescription className="sr-only">Project details for {project.title}</DialogDescription>
