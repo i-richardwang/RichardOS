@@ -1,4 +1,8 @@
-/* Blog content styles - 简化版本 */
+/* ====================================
+   Blog Content Styles
+   WordPress博客内容的渲染样式
+   ==================================== */
+
 .blog-content {
   color: #1f2937;
   line-height: 1.7;
@@ -9,7 +13,9 @@
   word-break: break-word;
 }
 
-/* 标题样式 */
+/* ====================================
+   标题样式
+   ==================================== */
 .blog-content h1,
 .blog-content h2,
 .blog-content h3,
@@ -30,22 +36,36 @@
 .blog-content h5,
 .blog-content h6 { font-size: 14px; }
 
+/* ====================================
+   基础元素样式
+   ==================================== */
 /* 段落和文本 */
 .blog-content p {
   margin: 16px 0;
   line-height: 1.7;
 }
 
+/* ====================================
+   图片和媒体样式
+   ==================================== */
 /* 图片样式 */
 .blog-content img {
   max-width: 100% !important;
-  width: 100% !important;
   height: auto !important;
   border-radius: 6px;
-  margin: 16px 0;
+  display: block;
+  margin: 16px auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
   object-fit: contain;
+}
+
+/* 限定尺寸图片的容器样式 */
+.blog-content .wp-block-image.is-resized {
+  display: table;
+  margin-left: auto;
+  margin-right: auto;
+  width: auto;
 }
 
 /* 链接样式 */
@@ -72,7 +92,8 @@
 }
 
 /* 引用样式 */
-.blog-content blockquote {
+.blog-content blockquote,
+.blog-content .wp-block-quote {
   margin: 20px 0;
   padding: 16px 20px;
   background: #f8fafc;
@@ -153,11 +174,15 @@
   margin: 20px 0;
 }
 
-.blog-content .wp-block-quote {
-  margin: 20px 0;
-  padding: 16px 20px;
-  background: #f8fafc;
-  border-left: 4px solid #64748b;
+/* 图片说明文字居中 */
+.blog-content .wp-element-caption,
+.blog-content figcaption {
+  text-align: center;
+  font-style: italic;
+  color: #6b7280;
+  font-size: 11px;
+  margin-top: 8px;
+  line-height: 1.4;
 }
 
 .blog-content .wp-block-code {

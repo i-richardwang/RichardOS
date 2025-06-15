@@ -9,17 +9,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { generateAppShareUrl } from "@/utils/sharedUrl";
+import { cn } from "@/lib/utils";
 
 interface BlogMenuBarProps {
   onClose: () => void;
   onShowHelp: () => void;
   onShowAbout: () => void;
+  onToggleSidebar: () => void;
+  isSidebarVisible: boolean;
 }
 
 export function BlogMenuBar({
   onClose,
   onShowHelp,
   onShowAbout,
+  onToggleSidebar,
+  isSidebarVisible,
 }: BlogMenuBarProps) {
   return (
     <MenuBar>
@@ -62,6 +67,29 @@ export function BlogMenuBar({
             className="text-md h-6 px-3 active:bg-gray-900 active:text-white"
           >
             Close
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* View Menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="default"
+            className="h-6 text-md px-2 py-1 border-none hover:bg-gray-200 active:bg-gray-900 active:text-white focus-visible:ring-0"
+          >
+            View
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" sideOffset={1} className="px-0">
+          <DropdownMenuItem
+            onClick={onToggleSidebar}
+            className="text-md h-6 px-3 active:bg-gray-900 active:text-white"
+          >
+            <span className={cn(!isSidebarVisible && "pl-4")}>
+              {isSidebarVisible ? "✓ Show Sidebar" : "Show Sidebar"}
+            </span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

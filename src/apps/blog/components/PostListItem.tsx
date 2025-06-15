@@ -11,7 +11,7 @@ export function PostListItem({ post, onClick }: PostListItemProps) {
       className="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
       onClick={onClick}
     >
-      <h3 className="font-geneva-12 text-[12px] font-semibold text-black mb-1 line-clamp-2">
+      <h3 className="font-geneva-12 text-[14px] font-semibold text-black mb-1 line-clamp-2">
         {post.title}
       </h3>
       

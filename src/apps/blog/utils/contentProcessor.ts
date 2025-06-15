@@ -69,10 +69,18 @@ export class WordPressContentProcessor {
       }
     );
 
-    // 移除图片的内联样式，让 CSS 处理
+    // 智能处理图片的内联样式：保留width设置，移除其他可能干扰的样式
     content = content.replace(
-      /<img([^>]*?)style=['"][^'"]*['"]([^>]*?)>/g,
-      '<img$1$2>'
+      /<img([^>]*?)style=['"]([^'"]*)['"]([^>]*?)>/g,
+      (match, before, style, after) => {
+        // 如果样式包含 width 属性，则保留整个 style 属性
+        // 这些通常是在WordPress后台手动调整过尺寸的图片
+        if (style.includes('width:')) {
+          return match;
+        }
+        // 否则，移除 style 属性以避免布局干扰
+        return `<img${before}${after}>`;
+      }
     );
 
     // 处理 WordPress 图片包装器

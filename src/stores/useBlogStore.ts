@@ -18,6 +18,9 @@ interface BlogData {
   searchQuery: string;
   filteredPosts: BlogPost[];
   
+  // UI状态
+  isSidebarVisible: boolean;
+  
   // 加载状态
   isLoading: boolean;
   isInitialized: boolean;
@@ -31,6 +34,7 @@ const initialBlogData: BlogData = {
   selectedCategory: null,
   searchQuery: '',
   filteredPosts: [],
+  isSidebarVisible: true,
   isLoading: false,
   isInitialized: false,
   error: null,
@@ -41,6 +45,7 @@ export interface BlogState extends BlogData {
   setSelectedPost: (post: BlogPost | null) => void;
   setSelectedCategory: (categoryId: number | null) => void;
   setSearchQuery: (query: string) => void;
+  toggleSidebarVisibility: () => void;
   
   // 数据加载
   loadPosts: () => Promise<void>;
@@ -83,6 +88,10 @@ export const useBlogStore = create<BlogState>()(
           return matchesCategory && matchesSearch;
         });
         set({ filteredPosts: filtered });
+      },
+
+      toggleSidebarVisibility: () => {
+        set((state) => ({ isSidebarVisible: !state.isSidebarVisible }));
       },
 
       loadPosts: async () => {
@@ -149,7 +158,8 @@ export const useBlogStore = create<BlogState>()(
       partialize: (state) => ({
         posts: state.posts,
         categories: state.categories,
-        // 只持久化数据，不保存用户的搜索和选择状态
+        isSidebarVisible: state.isSidebarVisible,
+        // 只持久化数据和UI偏好，不保存用户的搜索和选择状态
       }),
       onRehydrateStorage: () => {
         return (state, error) => {
