@@ -149,6 +149,19 @@ project/
 └── ...config files   # e.g., vite.config.ts, tsconfig.json, package.json
 ```
 
+## Configuration
+
+### Custom AI Provider
+
+To use a custom OpenAI-compatible AI provider, set these environment variables:
+
+```bash
+CUSTOM_AI_PROVIDER_NAME="your-provider-name"
+CUSTOM_AI_PROVIDER_BASE_URL="https://api.yourprovider.com/v1"
+CUSTOM_AI_PROVIDER_API_KEY="your-api-key"
+CUSTOM_AI_PROVIDER_MODEL_NAME="your-model-name"
+```
+
 ## Development
 
 The project uses:

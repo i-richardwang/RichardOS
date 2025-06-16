@@ -13,7 +13,7 @@ import { useAiChat } from "../hooks/useAiChat";
 import React from "react";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
-import { ChatRoomSidebar } from "./ChatRoomSidebar";
+// import { ChatRoomSidebar } from "./ChatRoomSidebar";
 import { useChatsStore } from "@/stores/useChatsStore";
 import { type Message as UIMessage } from "ai/react";
 import {
@@ -22,8 +22,8 @@ import {
 } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { useRyoChat } from "../hooks/useRyoChat";
-import { ChevronDown } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+// import { ChevronDown } from "lucide-react";
+// import { motion, AnimatePresence } from "framer-motion";
 import { getPrivateRoomDisplayName } from "@/utils/chat";
 import { useTokenRefresh } from "../hooks/useTokenRefresh";
 import { TokenStatus } from "./TokenStatus";
@@ -93,7 +93,7 @@ export function ChatsAppComponent({
     toggleSidebarVisibility,
     handleAddRoom,
     promptAddRoom,
-    promptDeleteRoom,
+    // promptDeleteRoom,
     isUsernameDialogOpen,
     setIsUsernameDialogOpen,
     newUsername,
@@ -132,6 +132,7 @@ export function ChatsAppComponent({
   const maxDisplayNames = 3;
   const displayNames = usersList.slice(0, maxDisplayNames);
   const remainingCount = usersList.length - displayNames.length;
+  // @ts-ignore - Variable preserved for easy restoration of chat room functionality
   const tooltipText =
     displayNames.join(", ") +
     (remainingCount > 0 ? `, ${remainingCount}+` : "");
@@ -169,6 +170,7 @@ export function ChatsAppComponent({
   const sidebarVisibleBool = isSidebarVisible ?? false;
 
   // Handler for mobile room selection that auto-dismisses the sidebar
+  // @ts-ignore - Function preserved for easy restoration of chat room functionality
   const handleMobileRoomSelect = useCallback(
     (room: ChatRoom | null) => {
       handleRoomSelectWithScroll(room ? room.id : null);
@@ -369,14 +371,14 @@ export function ChatsAppComponent({
         isShaking={isShaking}
       >
         <div ref={containerRef} className="relative h-full w-full">
-          {/* Mobile sidebar overlay with framer-motion 3D animations */}
+          {/* Mobile sidebar overlay with framer-motion 3D animations - HIDDEN: Chat room sidebar functionality */}
+          {/* 
           <AnimatePresence>
             {sidebarVisibleBool && isFrameNarrow && (
               <motion.div
                 className="absolute inset-0 z-20"
                 style={{ perspective: "2000px" }}
               >
-                {/* Scrim - fades in and out */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.4 }}
@@ -389,7 +391,6 @@ export function ChatsAppComponent({
                   onClick={toggleSidebarVisibility}
                 />
 
-                {/* Sidebar - 3D flip animation, full width but fit content height */}
                 <motion.div
                   initial={{
                     rotateX: -60,
@@ -423,7 +424,7 @@ export function ChatsAppComponent({
                     transformPerspective: "2000px",
                     backfaceVisibility: "hidden",
                     willChange: "transform",
-                    maxHeight: "70%", // Limit height to 70% of container
+                    maxHeight: "70%",
                   }}
                 >
                   <ChatRoomSidebar
@@ -432,7 +433,7 @@ export function ChatsAppComponent({
                     onRoomSelect={handleMobileRoomSelect}
                     onAddRoom={promptAddRoom}
                     onDeleteRoom={(room) => promptDeleteRoom(room)}
-                    isVisible={true} // Always visible when overlay is shown
+                    isVisible={true}
                     isAdmin={isAdmin}
                     username={username}
                     isOverlay={true}
@@ -441,11 +442,13 @@ export function ChatsAppComponent({
               </motion.div>
             )}
           </AnimatePresence>
+          */}
 
           {/* Layout based on WindowFrame width */}
           <div
             className={`flex h-full ${isFrameNarrow ? "flex-col" : "flex-row"}`}
           >
+            {/* HIDDEN: Desktop sidebar - uncomment to restore chat room functionality
             <div className={`${isFrameNarrow ? "hidden" : "block"} h-full`}>
               <ChatRoomSidebar
                 rooms={rooms}
@@ -460,12 +463,14 @@ export function ChatsAppComponent({
                 username={username}
               />
             </div>
+            */}
 
             {/* Chat area */}
             <div className="relative flex flex-col flex-1 h-full bg-white/85">
               {/* Mobile chat title bar */}
               <div className="sticky top-0 z-10 flex items-center justify-between px-2 py-1 bg-neutral-200/90 backdrop-blur-lg border-b border-black">
                 <div className="flex items-center">
+                  {/* HIDDEN: Room selector button - now shows only @ryo title
                   <Button
                     variant="ghost"
                     onClick={toggleSidebarVisibility}
@@ -480,7 +485,12 @@ export function ChatsAppComponent({
                     </h2>
                     <ChevronDown className="h-3 w-3 transform transition-transform duration-200 text-neutral-400" />
                   </Button>
+                  */}
+                  <h2 className="font-geneva-12 text-[12px] font-medium truncate px-2 py-1">
+                    @ryo
+                  </h2>
 
+                  {/* HIDDEN: Room user list - chat room functionality disabled
                   {currentRoom &&
                     currentRoom.type !== "private" &&
                     usersList.length > 0 && (
@@ -488,6 +498,7 @@ export function ChatsAppComponent({
                         {tooltipText}
                       </span>
                     )}
+                  */}
                 </div>
                 <div className="flex items-center gap-2">
                   {/* Token status indicator */}
@@ -517,7 +528,7 @@ export function ChatsAppComponent({
                     </Button>
                   )}
 
-                  {/* Leave button for private rooms */}
+                  {/* HIDDEN: Leave button for private rooms - chat room functionality disabled
                   {currentRoom && currentRoom.type === "private" && (
                     <Button
                       variant="ghost"
@@ -527,6 +538,7 @@ export function ChatsAppComponent({
                       <span className="font-geneva-12 text-[11px]">Leave</span>
                     </Button>
                   )}
+                  */}
                 </div>
               </div>
 

@@ -30,6 +30,10 @@ export const AI_MODELS = {
     name: "gpt-4.1-mini",
     provider: "OpenAI",
   },
+  "custom": {
+    name: "Custom",
+    provider: "Custom",
+  },
 } as const;
 
 // Derived types
@@ -54,4 +58,4 @@ export const AI_MODEL_METADATA: AIModelInfo[] = Object.entries(AI_MODELS).map(
 );
 
 // Default model
-export const DEFAULT_AI_MODEL: SupportedModel = "claude-4";
+export const DEFAULT_AI_MODEL: SupportedModel = "custom";

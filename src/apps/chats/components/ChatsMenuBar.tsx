@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { generateAppShareUrl } from "@/utils/sharedUrl";
 import { useAppStoreShallow } from "@/stores/helpers";
 import { SYNTH_PRESETS } from "@/hooks/useChatSynth";
-import { getPrivateRoomDisplayName } from "@/utils/chat";
+// import { getPrivateRoomDisplayName } from "@/utils/chat";
 
 interface ChatsMenuBarProps {
   onClose: () => void;
@@ -41,18 +41,18 @@ export function ChatsMenuBar({
   onShowAbout,
   onClearChats,
   onSaveTranscript,
-  onSetUsername,
-  onToggleSidebar,
-  isSidebarVisible,
-  onAddRoom,
-  rooms,
+  // onSetUsername,
+  // onToggleSidebar,
+  // isSidebarVisible,
+  // onAddRoom,
+  // rooms,
   currentRoom,
-  onRoomSelect,
+  // onRoomSelect,
   onIncreaseFontSize,
   onDecreaseFontSize,
   onResetFontSize,
-  username,
-  authToken,
+  // username,
+  // authToken,
 }: ChatsMenuBarProps) {
   const {
     speechEnabled,
@@ -61,7 +61,7 @@ export function ChatsMenuBar({
     setTypingSynthEnabled,
     synthPreset,
     setSynthPreset,
-    debugMode,
+    // debugMode,
   } = useAppStoreShallow((s) => ({
     speechEnabled: s.speechEnabled,
     setSpeechEnabled: s.setSpeechEnabled,
@@ -109,7 +109,7 @@ export function ChatsMenuBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Rooms Menu */}
+      {/* HIDDEN: Entire Rooms Menu - chat room functionality disabled
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -125,7 +125,6 @@ export function ChatsMenuBar({
           sideOffset={1}
           className="px-0 max-h-[300px] overflow-y-auto"
         >
-          {/* New Room - available to all users */}
           <DropdownMenuItem
             onClick={onAddRoom}
             className="text-md h-6 px-3 active:bg-gray-900 active:text-white"
@@ -133,7 +132,6 @@ export function ChatsMenuBar({
             New Chat...
           </DropdownMenuItem>
 
-          {/* Set Username - show when debugMode OR username not set OR authToken is null */}
           {(debugMode || !username || !authToken) && (
             <DropdownMenuItem
               onClick={onSetUsername}
@@ -143,12 +141,10 @@ export function ChatsMenuBar({
             </DropdownMenuItem>
           )}
 
-          {/* Show separator between menu actions and room list */}
           {rooms.length > 0 && (
             <DropdownMenuSeparator className="h-[2px] bg-black my-1" />
           )}
 
-          {/* Ryo Chat Option */}
           <DropdownMenuItem
             onClick={() => onRoomSelect(null)}
             className={cn(
@@ -161,10 +157,8 @@ export function ChatsMenuBar({
             </span>
           </DropdownMenuItem>
 
-          {/* Room List */}
           {Array.isArray(rooms) &&
             (() => {
-              // Sort rooms: private rooms first, then public rooms
               const privateRooms = rooms.filter(
                 (room) => room.type === "private"
               );
@@ -201,6 +195,7 @@ export function ChatsMenuBar({
             })()}
         </DropdownMenuContent>
       </DropdownMenu>
+      */}
 
       {/* Sounds Menu */}
       <DropdownMenu>
@@ -280,8 +275,8 @@ export function ChatsMenuBar({
           >
             Reset Font Size
           </DropdownMenuItem>
+          {/* HIDDEN: Sidebar Toggle - chat room functionality disabled
           <DropdownMenuSeparator className="h-[2px] bg-black my-1" />
-          {/* Sidebar Toggle */}
           <DropdownMenuItem
             onClick={() => {
               console.log("[MenuBar] Toggle Sidebar menu item clicked");
@@ -293,6 +288,7 @@ export function ChatsMenuBar({
               {isSidebarVisible ? "✓ Show Rooms" : "Show Rooms"}
             </span>
           </DropdownMenuItem>
+          */}
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -620,7 +620,9 @@ export default async function handler(req: Request) {
       ...CACHE_CONTROL_OPTIONS,
     };
 
-    const enrichedMessages = [dynamicSystemMessage, ...messages];
+    // Keep only the last 10 messages for AI context (UI still shows full history)
+    const recentMessages = messages.slice(-10);
+    const enrichedMessages = [dynamicSystemMessage, ...recentMessages];
 
     // Log all messages right before model call (as per user preference)
     enrichedMessages.forEach((msg, index) => {

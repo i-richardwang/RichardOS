@@ -8,12 +8,14 @@ export const helpItems = [
     description:
       "Type your message to chat with Ryo, generate code, or help with Richard OS.",
   },
+  /* HIDDEN: Chat room functionality disabled - uncomment to restore
   {
     icon: "#️⃣",
     title: "Join Chat Rooms",
     description:
       "Connect with netizens in public chat rooms.",
   },
+  */
   {
     icon: "🎤",
     title: "Push to Talk",
