@@ -1539,24 +1539,24 @@ export function ControlPanelsAppComponent({
                         <SelectTrigger className="w-[120px]">
                           <SelectValue placeholder="Select">
                             {ttsVoice === "YC3iw27qriLq7UUaqAyi"
-                              ? "Ryo v3"
+                              ? "Richard v3"
                               : ttsVoice === "kAyjEabBEu68HYYYRAHR"
-                              ? "Ryo v2"
+                              ? "Richard v2"
                               : ttsVoice === "G0mlS0y8ByHjGAOxBgvV"
-                              ? "Ryo"
+                              ? "Richard"
                               : "Select"}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__null__">Select</SelectItem>
                           <SelectItem value="YC3iw27qriLq7UUaqAyi">
-                            Ryo v3
+                            Richard v3
                           </SelectItem>
                           <SelectItem value="kAyjEabBEu68HYYYRAHR">
-                            Ryo v2
+                            Richard v2
                           </SelectItem>
                           <SelectItem value="G0mlS0y8ByHjGAOxBgvV">
-                            Ryo
+                            Richard
                           </SelectItem>
                         </SelectContent>
                       </Select>

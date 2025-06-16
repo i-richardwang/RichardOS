@@ -4,9 +4,9 @@ import { ChatsAppComponent } from "./components/ChatsAppComponent";
 export const helpItems = [
   {
     icon: "💬",
-    title: "Chat with Ryo",
+    title: "Chat with Richard",
     description:
-      "Type your message to chat with Ryo, generate code, or help with Richard OS.",
+      "Type your message to chat with Richard, generate code, or help with Richard OS.",
   },
   /* HIDDEN: Chat room functionality disabled - uncomment to restore
   {
@@ -26,19 +26,19 @@ export const helpItems = [
     icon: "📝",
     title: "Control TextEdit",
     description:
-      "Ask Ryo to read, insert, replace, or delete lines in your open TextEdit document.",
+      "Ask Richard to read, insert, replace, or delete lines in your open TextEdit document.",
   },
   {
     icon: "🚀",
     title: "Control Apps",
     description:
-      "Ask Ryo to launch or close other applications like Internet Explorer or Video Player.",
+      "Ask Richard to launch or close other applications like Internet Explorer or Video Player.",
   },
   {
     icon: "💾",
     title: "Save Transcript",
     description:
-      "Save your current chat conversation with Ryo as a Markdown file.",
+      "Save your current chat conversation with Richard as a Markdown file.",
   },
 ];
 
@@ -57,7 +57,7 @@ export const ChatsApp: BaseApp = {
   id: "chats",
   name: "Chats",
   icon: { type: "image", src: appMetadata.icon },
-  description: "Chat with Ryo, your personal AI assistant",
+  description: "Chat with Richard, your personal AI assistant",
   component: ChatsAppComponent,
   helpItems,
   metadata: appMetadata,

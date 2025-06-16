@@ -153,7 +153,7 @@ export function ChatsMenuBar({
             )}
           >
             <span className={cn(currentRoom !== null && "pl-4")}>
-              {currentRoom === null ? "✓ @ryo" : "@ryo"}
+              {currentRoom === null ? "✓ @richard" : "@richard"}
             </span>
           </DropdownMenuItem>
 

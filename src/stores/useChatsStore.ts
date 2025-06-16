@@ -153,7 +153,7 @@ export interface ChatsStoreState {
   username: string | null;
   authToken: string | null; // Authentication token
   rooms: ChatRoom[];
-  currentRoomId: string | null; // ID of the currently selected room, null for AI chat (@ryo)
+  currentRoomId: string | null; // ID of the currently selected room, null for AI chat (@richard)
   roomMessages: Record<string, ChatMessage[]>; // roomId -> messages map
   unreadCounts: Record<string, number>; // roomId -> unread message count
   hasEverUsedChats: boolean; // Track if user has ever used chat before
@@ -216,7 +216,7 @@ export interface ChatsStoreState {
 const initialAiMessage: Message = {
   id: "1",
   role: "assistant",
-  content: "👋 hey! i'm ryo. ask me anything!",
+  content: "👋 hey! i'm richard. ask me anything!",
   createdAt: new Date(),
 };
 
@@ -935,7 +935,7 @@ export const useChatsStore = create<ChatsStoreState>()(
             }
 
             // Room will be removed via Pusher update
-            // If we're currently in this room, switch to @ryo
+            // If we're currently in this room, switch to @richard
             const currentRoomId = get().currentRoomId;
             if (currentRoomId === roomId) {
               set({ currentRoomId: null });

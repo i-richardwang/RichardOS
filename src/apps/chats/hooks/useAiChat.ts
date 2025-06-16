@@ -1334,7 +1334,7 @@ export function useAiChat(onPromptSetUsername?: () => void) {
     const initialMessage: Message = {
       id: "1", // Ensure consistent ID for the initial message
       role: "assistant",
-      content: "👋 hey! i'm ryo. ask me anything!",
+      content: "👋 hey! i'm richard. ask me anything!",
       createdAt: new Date(),
     };
     speechProgressRef.current[initialMessage.id] =
@@ -1387,7 +1387,7 @@ export function useAiChat(onPromptSetUsername?: () => void) {
                 minute: "2-digit",
               })
             : "";
-          const sender = msg.role === "user" ? username || "You" : "Ryo";
+          const sender = msg.role === "user" ? username || "You" : "Richard";
           return `**${sender}** (${time}):\n${msg.content}`;
         })
         .join("\n\n");

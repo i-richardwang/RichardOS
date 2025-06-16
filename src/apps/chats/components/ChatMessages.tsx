@@ -126,7 +126,7 @@ const getErrorMessage = (error: Error): string => {
         if (errorData.isAuthenticated) {
           return `Daily AI message limit reached.`;
         } else {
-          return `Set a username to continue chatting with Ryo.`;
+          return `Set a username to continue chatting with Richard.`;
         }
       }
 
@@ -192,9 +192,9 @@ interface ChatMessagesProps {
   error?: Error;
   onRetry?: () => void;
   onClear?: () => void;
-  isRoomView: boolean; // Indicates if this is a room view (vs Ryo chat)
+  isRoomView: boolean; // Indicates if this is a room view (vs Richard chat)
   roomId?: string; // Needed for message deletion calls
-  isAdmin?: boolean; // Whether the current user has admin privileges (e.g. username === "ryo")
+  isAdmin?: boolean; // Whether the current user has admin privileges (e.g. username === "richard")
   username?: string; // Current client username (needed for delete request)
   onMessageDeleted?: (messageId: string) => void; // Callback when a message is deleted locally
   fontSize: number; // Add font size prop
@@ -525,10 +525,10 @@ function ChatMessagesContent({
               <span
                 className="max-w-[120px] inline-block overflow-hidden text-ellipsis whitespace-nowrap"
                 title={
-                  message.username || (message.role === "user" ? "You" : "Ryo")
+                  message.username || (message.role === "user" ? "You" : "Richard")
                 }
               >
-                {message.username || (message.role === "user" ? "You" : "Ryo")}
+                {message.username || (message.role === "user" ? "You" : "Richard")}
               </span>{" "}
               <span className="text-gray-400 select-text">
                 {message.createdAt ? (
@@ -1060,7 +1060,7 @@ function ChatMessagesContent({
           const errorMessage = getErrorMessage(error);
           const isRateLimitError =
             errorMessage === "Daily AI message limit reached." ||
-            errorMessage === "Set a username to continue chatting with Ryo.";
+            errorMessage === "Set a username to continue chatting with Richard.";
 
           // Don't show these errors in chat since they're handled by other UI
           if (isRateLimitError) return null;

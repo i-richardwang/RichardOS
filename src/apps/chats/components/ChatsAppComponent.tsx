@@ -137,7 +137,7 @@ export function ChatsAppComponent({
     displayNames.join(", ") +
     (remainingCount > 0 ? `, ${remainingCount}+` : "");
 
-  // Use the @ryo chat hook
+  // Use the @richard chat hook
   const { isRyoLoading, stopRyo, handleRyoMention, detectAndProcessMention } =
     useRyoChat({
       currentRoomId,
@@ -189,7 +189,7 @@ export function ChatsAppComponent({
       if (currentRoomId && username) {
         const trimmedInput = input.trim();
 
-        // Detect if this is an @ryo mention
+        // Detect if this is an @richard mention
         const { isMention, messageContent } =
           detectAndProcessMention(trimmedInput);
 
@@ -199,7 +199,7 @@ export function ChatsAppComponent({
             target: { value: "" },
           } as React.ChangeEvent<HTMLInputElement>);
 
-          // Send the user's message to the chat room first (showing @ryo)
+          // Send the user's message to the chat room first (showing @richard)
           sendRoomMessage(input);
 
           // Then send to AI (doesn't affect input clearing)
@@ -254,10 +254,10 @@ export function ChatsAppComponent({
     setScrollToBottomTrigger((prev) => prev + 1);
   }, [handleNudge]);
 
-  // Combined stop function for both AI chat and @ryo mentions
+  // Combined stop function for both AI chat and @richard mentions
   const handleStop = useCallback(() => {
     stop(); // Stop regular AI chat
-    stopRyo(); // Stop @ryo chat
+    stopRyo(); // Stop @richard chat
   }, [stop, stopRyo]);
 
   // Font size handlers using store action
@@ -327,7 +327,7 @@ export function ChatsAppComponent({
         ...msg,
         // Ensure createdAt is a Date object if it exists, otherwise undefined
         createdAt: msg.createdAt ? new Date(msg.createdAt) : undefined,
-        username: msg.role === "user" ? username || "You" : "Ryo",
+        username: msg.role === "user" ? username || "You" : "Richard",
       }));
 
   return (
@@ -359,7 +359,7 @@ export function ChatsAppComponent({
             ? currentRoom.type === "private"
               ? getPrivateRoomDisplayName(currentRoom, username)
               : `#${currentRoom.name}`
-            : "@ryo"
+            : "@richard"
         }
         onClose={onClose}
         isForeground={isForeground}
@@ -470,7 +470,7 @@ export function ChatsAppComponent({
               {/* Mobile chat title bar */}
               <div className="sticky top-0 z-10 flex items-center justify-between px-2 py-1 bg-neutral-200/90 backdrop-blur-lg border-b border-black">
                 <div className="flex items-center">
-                  {/* HIDDEN: Room selector button - now shows only @ryo title
+                  {/* HIDDEN: Room selector button - now shows only @richard title
                   <Button
                     variant="ghost"
                     onClick={toggleSidebarVisibility}
@@ -481,13 +481,13 @@ export function ChatsAppComponent({
                         ? currentRoom.type === "private"
                           ? getPrivateRoomDisplayName(currentRoom, username)
                           : `#${currentRoom.name}`
-                        : "@ryo"}
+                                : "@richard"}
                     </h2>
                     <ChevronDown className="h-3 w-3 transform transition-transform duration-200 text-neutral-400" />
                   </Button>
                   */}
                   <h2 className="font-geneva-12 text-[12px] font-medium truncate px-2 py-1">
-                    @ryo
+                    @richard
                   </h2>
 
                   {/* HIDDEN: Room user list - chat room functionality disabled
@@ -504,7 +504,7 @@ export function ChatsAppComponent({
                   {/* Token status indicator */}
                   {username && authToken && <TokenStatus />}
 
-                  {/* Set Username button shown only in @ryo view when no username is set */}
+                  {/* Set Username button shown only in @richard view when no username is set */}
                   {!currentRoom && !username && (
                     <Button
                       variant="ghost"
@@ -517,7 +517,7 @@ export function ChatsAppComponent({
                     </Button>
                   )}
 
-                  {/* Clear chat button shown only in @ryo (no current room) */}
+                  {/* Clear chat button shown only in @richard (no current room) */}
                   {!currentRoom && (
                     <Button
                       variant="ghost"
@@ -547,7 +547,7 @@ export function ChatsAppComponent({
                 {/* Chat Messages Area - will scroll under header */}
                 <div className="flex-1 overflow-hidden">
                   <ChatMessages
-                    key={currentRoomId || "ryo"}
+                    key={currentRoomId || "richard"}
                     messages={currentMessagesToDisplay}
                     isLoading={
                       (isLoading && !currentRoomId) ||
@@ -570,7 +570,7 @@ export function ChatsAppComponent({
                 <div className="absolute bottom-0 z-10 w-full p-2">
                   {/* Show "Set Username" button in two cases:
                       1. In a chat room without username
-                      2. In @ryo chat when rate limit is hit for anonymous users */}
+                      2. In @richard chat when rate limit is hit for anonymous users */}
                   {(currentRoomId && !username) ||
                   (!currentRoomId && needsUsername && !username) ? (
                     <Button

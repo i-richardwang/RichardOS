@@ -31,7 +31,7 @@ export const helpItems = [
   {
     icon: "⚡",
     title: "Slash Commands",
-    description: "Type / for quick actions or let Ryo AI edit lines remotely",
+    description: "Type / for quick actions or let Richard AI edit lines remotely",
   },
 ];
 

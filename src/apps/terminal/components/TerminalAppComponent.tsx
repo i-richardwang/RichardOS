@@ -68,6 +68,7 @@ const AVAILABLE_COMMANDS = [
   "edit",
   "history",
   "about",
+  "richard",
   "ryo",
   "ai",
   "chat",
@@ -1698,7 +1699,7 @@ terminal
   cowsay <text>    a talking cow
 
 assistant
-  ryo <prompt>     chat with ryo
+  richard <prompt>     chat with richard
 
 `,
           isError: false,
@@ -2367,7 +2368,7 @@ assistant
 
       case "ai":
       case "chat":
-      case "ryo": {
+      case "richard": {
         // Enter AI chat mode
         setIsInAiMode(true);
 
@@ -2401,7 +2402,7 @@ assistant
             },
             {
               command: "",
-              output: `${spinnerChars[spinnerIndex]} ryo is thinking...`,
+              output: `${spinnerChars[spinnerIndex]} richard is thinking...`,
               path: "ai-thinking",
             },
           ]);
@@ -2413,13 +2414,13 @@ assistant
           );
 
           return {
-            output: `ask ryo anything. type 'exit' to return to terminal.\n→ from your command: ${initialPrompt}`,
+            output: `ask richard anything. type 'exit' to return to terminal.\n→ from your command: ${initialPrompt}`,
             isError: false,
           };
         }
 
         return {
-          output: `ask ryo anything. type 'exit' to return to terminal.`,
+          output: `ask richard anything. type 'exit' to return to terminal.`,
           isError: false,
         };
       }
@@ -2548,7 +2549,7 @@ assistant
     // Store in Zustand (including AI commands)
     useTerminalStore
       .getState()
-      .addCommand(command.startsWith("ryo ") ? command : `ryo ${command}`);
+      .addCommand(command.startsWith("richard ") ? command : `richard ${command}`);
 
     // Reset animated lines to ensure only new content gets animated
     setAnimatedLines(new Set());
@@ -2620,7 +2621,7 @@ assistant
           {
             command: "",
             output:
-              "chat cleared. you're still chatting with ryo. type 'exit' to return to terminal.",
+              "chat cleared. you're still chatting with richard. type 'exit' to return to terminal.",
             path: "ai-assistant",
           },
         ]);
@@ -2856,7 +2857,7 @@ assistant
         !item.output.startsWith("command not found") &&
         !item.output.includes("commands") &&
         !item.output.includes("     __  __") &&
-        !item.output.includes("ask ryo anything.") &&
+        !item.output.includes("ask richard anything.") &&
         // Don't animate ls command output
         !(item.command && item.command.trim().startsWith("ls"))
       ) {
@@ -3077,7 +3078,7 @@ assistant
                   {item.path === "ai-user" ? (
                     <span className="text-purple-400 mr-2 select-text cursor-text">
                       <span className="inline-block w-2 text-center">→</span>{" "}
-                      ryo
+                      richard
                     </span>
                   ) : (
                     <span className="text-green-400 mr-2 select-text cursor-text">
@@ -3101,7 +3102,7 @@ assistant
                     isUrgentMessage(item.output) ? "text-red-400" : ""
                   } ${
                     // Add system message styling
-                    item.output.startsWith("ask ryo anything") ||
+                    item.output.startsWith("ask richard anything") ||
                     item.output.startsWith("usage:") ||
                     item.output.startsWith("command not found:") ||
                     item.output.includes("type 'help' for") ||
@@ -3120,7 +3121,7 @@ assistant
                         <span className="inline-block w-2 text-center">
                           {item.output.split(" ")[0]}
                         </span>{" "}
-                        ryo
+                        richard
                       </span>
                       <span className="text-gray-500 italic shimmer-subtle">
                         {" is thinking"}
@@ -3273,12 +3274,12 @@ assistant
                       <span className="inline-block w-2 text-center">
                         {spinnerChars[spinnerIndex]}
                       </span>{" "}
-                      ryo
+                      richard
                     </span>
                   </span>
                 ) : (
                   <>
-                    <span className="inline-block w-2 text-center">→</span> ryo
+                    <span className="inline-block w-2 text-center">→</span> richard
                   </>
                 )}
               </span>
