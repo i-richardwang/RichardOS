@@ -63,14 +63,14 @@ export function AboutFinderDialog({
         <div className="flex">
           {/* Right side with system info */}
           <div className="space-y-3 flex-1 ">
-            <div className="flex flex-row items-center space-x-2 p-2 px-4">
+            <div className="flex flex-row items-center space-x-6 p-2 px-4">
               <div className="flex flex-col w-1/3 items-center space-x-2">
                 <img
                   src="/icons/mac-classic.png"
                   alt="Happy Mac"
                   className="w-10 h-10 mb-0 [image-rendering:pixelated]"
                 />
-                <div className="font-apple-garamond text-xl">Richard OS 8.2</div>
+                <div className="font-apple-garamond text-xl">Richard OS 3.1</div>
               </div>
 
               <div className="space-y-4 font-geneva-12 text-[10px]">
@@ -81,7 +81,7 @@ export function AboutFinderDialog({
                     Largest Unused Block: {(32 - totalUsedMemory).toFixed(1)}MB
                   </div>
                   <div className="text-[10px] text-gray-500  mt-2  font-geneva-12 text-[10px]">
-                    © Richard Wang. 1992-{new Date().getFullYear()}
+                    © Richard Wang. 1994-{new Date().getFullYear()}
                   </div>
                 </div>
               </div>

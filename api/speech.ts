@@ -2,7 +2,7 @@ import { experimental_generateSpeech as generateSpeech } from "ai";
 import { openai } from "@ai-sdk/openai";
 
 // Allowed origins for CORS
-const ALLOWED_ORIGINS = new Set(["https://os.ryo.lu", "http://localhost:3000"]);
+const ALLOWED_ORIGINS = new Set(["https://os.richardwang.me", "http://localhost:3000"]);
 
 // --- Default Configuration -----------------------------------------------
 

@@ -83,7 +83,7 @@ export function BootScreen({
             <div className="flex flex-col items-center justify-center border border-neutral-200 bg-white p-8 w-full pb-4">
                 <img src="/assets/macos.svg" alt="macOS" className="w-64 h-32" />
                 <h1 className="text-[36px] font-mondwest mt-4 mb-0">
-                  <span className="text-blue-500">ry</span>OS 8.2
+                  <span className="text-blue-500">Richard</span>OS 3.1
                 </h1>
             </div>
             <h2 className="text-[16px] font-chicago mt-4 mb-1">{title}</h2>

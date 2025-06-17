@@ -121,7 +121,7 @@ interface SystemState {
 }
 
 // Allowed origins for API requests
-const ALLOWED_ORIGINS = new Set(["https://os.ryo.lu", "http://localhost:3000"]);
+const ALLOWED_ORIGINS = new Set(["https://os.richardwang.me", "http://localhost:3000"]);
 
 // Function to validate request origin
 // Only allow explicit origins defined in ALLOWED_ORIGINS – no wildcard ports or IP fallbacks
@@ -813,12 +813,12 @@ export default async function handler(req: Request) {
         },
         ipodAddAndPlaySong: {
           description:
-            "Adds a song to the iPod library from a YouTube video ID or URL and plays it. Supports YouTube URLs (youtube.com/watch?v=, youtu.be/), video IDs, and share URLs (os.ryo.lu/ipod/:id). The system will automatically fetch title, artist, and album information. The iPod app will be launched if it's not already open.",
+            "Adds a song to the iPod library from a YouTube video ID or URL and plays it. Supports YouTube URLs (youtube.com/watch?v=, youtu.be/), video IDs, and share URLs (os.richardwang.me/ipod/:id). The system will automatically fetch title, artist, and album information. The iPod app will be launched if it's not already open.",
           parameters: z.object({
             id: z
               .string()
               .describe(
-                "The YouTube video ID or any supported URL format (YouTube URL, os.ryo.lu/ipod/:id, etc.) of the song to add and play."
+                "The YouTube video ID or any supported URL format (YouTube URL, os.richardwang.me/ipod/:id, etc.) of the song to add and play."
               ),
           }),
         },

@@ -10,7 +10,7 @@ import { SUPPORTED_AI_MODELS } from "../src/types/aiModels";
 
 // Allowed origins for API requests (reuse list from chat.ts)
 const ALLOWED_ORIGINS = new Set([
-  "https://os.ryo.lu",
+  "https://os.richardwang.me",
   "http://localhost:3000",
 ]);
 

@@ -305,9 +305,9 @@ export const useIpodStore = create<IpodState>()(
           try {
             const url = new URL(input);
 
-            // Handle os.ryo.lu/ipod/:id format
+            // Handle os.richardwang.me/ipod/:id format
             if (
-              url.hostname === "os.ryo.lu" &&
+              url.hostname === "os.richardwang.me" &&
               url.pathname.startsWith("/ipod/")
             ) {
               return url.pathname.split("/")[2] || null;

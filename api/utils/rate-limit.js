@@ -33,8 +33,8 @@ async function checkAndIncrementAIMessageCount(
 
   const limit = isAuthenticated ? DAILY_USER_AI_LIMIT : ANONYMOUS_AI_LIMIT;
 
-  // Allow ryo to bypass rate limits
-  const isRyo = identifier === "ryo";
+  // Allow Richard to bypass rate limits
+  const isRichard = identifier === "richard";
 
   // If authenticated, validate the token
   if (isAuthenticated && authToken) {
@@ -48,7 +48,7 @@ async function checkAndIncrementAIMessageCount(
     }
   }
 
-  if (count >= limit && !isRyo) {
+  if (count >= limit && !isRichard) {
     return { allowed: false, count, limit };
   }
 
