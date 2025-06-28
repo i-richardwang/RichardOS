@@ -16,6 +16,7 @@ interface BlogMenuBarProps {
   onShowHelp: () => void;
   onShowAbout: () => void;
   onToggleSidebar: () => void;
+  onRefresh: () => void;
   isSidebarVisible: boolean;
 }
 
@@ -24,6 +25,7 @@ export function BlogMenuBar({
   onShowHelp,
   onShowAbout,
   onToggleSidebar,
+  onRefresh,
   isSidebarVisible,
 }: BlogMenuBarProps) {
   return (
@@ -40,6 +42,13 @@ export function BlogMenuBar({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={1} className="px-0">
+          <DropdownMenuItem
+            onClick={onRefresh}
+            className="text-md h-6 px-3 active:bg-gray-900 active:text-white"
+          >
+            Refresh Articles
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="h-[2px] bg-black my-1" />
           <DropdownMenuItem
             onSelect={async () => {
               const appId = "blog";

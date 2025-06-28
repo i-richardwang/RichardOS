@@ -22,7 +22,7 @@ interface WordPressPost {
   featured_media: number;
   categories: number[];
   tags: number[];
-  _links: Record<string, any>;
+  _links: Record<string, unknown>;
 }
 
 interface WordPressCategory {

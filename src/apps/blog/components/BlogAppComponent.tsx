@@ -45,6 +45,7 @@ export function BlogAppComponent({
     setSearchQuery,
     toggleSidebarVisibility,
     initializeBlog,
+    refreshPosts,
   } = useBlogStore();
 
   // 窗口宽度检测
@@ -125,6 +126,7 @@ export function BlogAppComponent({
         onShowHelp={() => setIsHelpDialogOpen(true)}
         onShowAbout={() => setIsAboutDialogOpen(true)}
         onToggleSidebar={toggleSidebarVisibility}
+        onRefresh={refreshPosts}
         isSidebarVisible={sidebarVisibleBool}
       />
       <WindowFrame

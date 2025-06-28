@@ -25,6 +25,9 @@ interface BlogData {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
+  
+  // 缓存管理
+  lastFetchTime: number | null;
 }
 
 const initialBlogData: BlogData = {
@@ -38,6 +41,7 @@ const initialBlogData: BlogData = {
   isLoading: false,
   isInitialized: false,
   error: null,
+  lastFetchTime: null,
 };
 
 export interface BlogState extends BlogData {
@@ -51,9 +55,13 @@ export interface BlogState extends BlogData {
   loadPosts: () => Promise<void>;
   loadCategories: () => Promise<void>;
   initializeBlog: () => Promise<void>;
+  refreshPosts: () => Promise<void>;
 }
 
-const CURRENT_BLOG_STORE_VERSION = 3;
+const CURRENT_BLOG_STORE_VERSION = 4;
+
+// 缓存过期时间：4小时
+const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
 export const useBlogStore = create<BlogState>()(
   persist(
@@ -102,6 +110,7 @@ export const useBlogStore = create<BlogState>()(
             posts, 
             filteredPosts: posts,
             isLoading: false,
+            lastFetchTime: Date.now(),
           });
         } catch (error) {
           set({ 
@@ -126,9 +135,14 @@ export const useBlogStore = create<BlogState>()(
           return;
         }
 
-        // 如果已有缓存数据，直接使用
-        const { posts } = get();
-        if (posts.length > 0) {
+        const { posts, lastFetchTime } = get();
+        
+        // 检查缓存是否有效（4小时内）
+        const isCacheValid = lastFetchTime && 
+          (Date.now() - lastFetchTime) < CACHE_DURATION;
+        
+        if (posts.length > 0 && isCacheValid) {
+          // 缓存有效，直接使用
           set({ 
             isInitialized: true,
             filteredPosts: posts 
@@ -136,7 +150,7 @@ export const useBlogStore = create<BlogState>()(
           return;
         }
 
-        // 首次加载才显示加载状态
+        // 缓存无效或为空，重新加载
         set({ isLoading: true, error: null });
         try {
           await Promise.all([
@@ -151,6 +165,22 @@ export const useBlogStore = create<BlogState>()(
           });
         }
       },
+
+      refreshPosts: async () => {
+        // 强制刷新，忽略缓存
+        set({ isLoading: true, error: null });
+        try {
+          await Promise.all([
+            get().loadPosts(),
+            get().loadCategories(),
+          ]);
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to refresh posts',
+            isLoading: false,
+          });
+        }
+      },
     }),
     {
       name: "ryos:blog",
@@ -159,6 +189,7 @@ export const useBlogStore = create<BlogState>()(
         posts: state.posts,
         categories: state.categories,
         isSidebarVisible: state.isSidebarVisible,
+        lastFetchTime: state.lastFetchTime,
         // 只持久化数据和UI偏好，不保存用户的搜索和选择状态
       }),
       onRehydrateStorage: () => {
