@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { type User } from "@/types/chat";
 
 interface CreateRoomDialogProps {
@@ -26,6 +26,7 @@ interface CreateRoomDialogProps {
   ) => Promise<{ ok: boolean; error?: string }>;
   isAdmin: boolean;
   currentUsername: string | null;
+  initialUsers?: string[]; // Optional prop to prefill users
 }
 
 export function CreateRoomDialog({
@@ -34,6 +35,7 @@ export function CreateRoomDialog({
   onSubmit,
   isAdmin,
   currentUsername,
+  initialUsers = [],
 }: CreateRoomDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,47 +44,57 @@ export function CreateRoomDialog({
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"public" | "private">("private");
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Fetch all users when dialog opens
+  // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
-      fetchUsers();
       // Reset form when opening
       setError(null);
       setRoomName("");
-      setSelectedUsers([]);
+      setSelectedUsers(initialUsers); // Use initialUsers if provided
       setSearchTerm("");
+      setUsers([]);
       // Reset to private tab when opening
       setActiveTab("private");
     }
-  }, [isOpen, isAdmin]);
+  }, [isOpen, initialUsers]);
 
-  const fetchUsers = async () => {
+  // Search for users when search term changes (with debouncing)
+  useEffect(() => {
+    if (searchTerm.length < 2) {
+      setUsers([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      searchUsers(searchTerm);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const searchUsers = async (query: string) => {
+    setIsSearching(true);
     try {
-      const response = await fetch("/api/chat-rooms?action=getUsers");
+      const response = await fetch(
+        `/api/chat-rooms?action=getUsers&search=${encodeURIComponent(query)}`
+      );
       if (response.ok) {
         const data = await response.json();
         const usersList = data.users || [];
-        // Filter out current user and parse user data
-        const parsedUsers = usersList
-          .map((u: string | User) =>
-            typeof u === "string" ? JSON.parse(u) : u
-          )
-          .filter((u: User) => u.username !== currentUsername?.toLowerCase());
-        setUsers(parsedUsers);
+        // Filter out current user
+        const filteredUsers = usersList.filter(
+          (u: User) => u.username !== currentUsername?.toLowerCase()
+        );
+        setUsers(filteredUsers);
       }
     } catch (error) {
-      console.error("Failed to fetch users:", error);
+      console.error("Failed to search users:", error);
+    } finally {
+      setIsSearching(false);
     }
   };
-
-  // Filter users based on search term (only show after 2 characters)
-  const filteredUsers =
-    searchTerm.length >= 2
-      ? users.filter((user) =>
-          user.username.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : [];
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -185,16 +197,21 @@ export function CreateRoomDialog({
                     htmlFor="search-users"
                     className="text-gray-700 text-[12px] font-geneva-12"
                   >
-                    Add to Private Chat
+                    Add Users to Private Chat
                   </Label>
-                  <Input
-                    id="search-users"
-                    placeholder="Search users..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="shadow-none font-geneva-12 text-[12px] h-8"
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="search-users"
+                      placeholder="Search username..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="shadow-none font-geneva-12 text-[12px] h-8 pr-8"
+                      disabled={isLoading}
+                    />
+                    {isSearching && searchTerm.length >= 2 && (
+                      <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+                    )}
+                  </div>
 
                   {/* Selected users tokens */}
                   {selectedUsers.length > 0 && (
@@ -220,10 +237,11 @@ export function CreateRoomDialog({
                   )}
                 </div>
 
-                {searchTerm.length >= 2 && filteredUsers.length > 0 && (
+                {/* Show results */}
+                {!isSearching && searchTerm.length >= 2 && users.length > 0 && (
                   <div className="border border-gray-300 rounded max-h-[180px] overflow-y-auto bg-white">
                     <div className="p-1">
-                      {filteredUsers.map((user) => (
+                      {users.map((user) => (
                         <label
                           key={user.username}
                           className="flex items-center p-2 hover:bg-gray-100 cursor-pointer rounded font-geneva-12 text-[12px]"
@@ -252,7 +270,7 @@ export function CreateRoomDialog({
             </p>
           )}
 
-          <DialogFooter className="mt-4 gap-2">
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
             <Button
               variant="retro"
               onClick={() => onOpenChange(false)}

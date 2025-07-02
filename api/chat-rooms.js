@@ -2,6 +2,7 @@ import { Redis } from "@upstash/redis";
 import { Filter } from "bad-words";
 import Pusher from "pusher";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 // Initialize profanity filter with custom placeholder
 const filter = new Filter({ placeHolder: "█" });
@@ -50,12 +51,18 @@ const CHAT_ROOM_PREFIX = "chat:room:";
 const CHAT_MESSAGES_PREFIX = "chat:messages:";
 const CHAT_USERS_PREFIX = "chat:users:";
 const CHAT_ROOM_USERS_PREFIX = "chat:room:users:";
+const CHAT_ROOM_PRESENCE_PREFIX = "chat:presence:"; // New: for tracking user presence in rooms with TTL
 
-// USER TTL (in seconds) – after this period of inactivity the user record expires automatically
-const USER_TTL_SECONDS = 2592000; // 30 days
+// TOKEN TTL (in seconds) – tokens expire after 90 days
+const USER_TTL_SECONDS = 7776000; // 90 days (kept for token expiry)
 
-// User expiration time in seconds (30 days)
-const USER_EXPIRATION_TIME = 2592000; // 30 days
+// Token expiration time in seconds (90 days)
+const USER_EXPIRATION_TIME = 7776000; // 90 days
+
+// Note: User records no longer expire - they persist forever
+
+// Room presence TTL (in seconds) – after this period of inactivity, user is considered offline in room
+const ROOM_PRESENCE_TTL_SECONDS = 86400; // 1 day (24 hours)
 
 // Add constants for max message and username length
 const MAX_MESSAGE_LENGTH = 1000;
@@ -65,26 +72,121 @@ const MIN_USERNAME_LENGTH = 3; // Minimum username length (must be more than 2 c
 // Token constants
 const AUTH_TOKEN_PREFIX = "chat:token:";
 const TOKEN_LENGTH = 32; // 32 bytes = 256 bits
-const TOKEN_GRACE_PERIOD = 86400 * 7; // 7 days grace period for refresh after expiry
+const TOKEN_GRACE_PERIOD = 86400 * 365; // 365 days (1 year) grace period for refresh after expiry
+
+// Password constants
+const PASSWORD_HASH_PREFIX = "chat:password:";
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_BCRYPT_ROUNDS = 10;
+
+// Rate limiting constants
+const RATE_LIMIT_WINDOW_SECONDS = 60; // 1 minute window
+const RATE_LIMIT_ATTEMPTS = 10; // Max attempts per window
+const RATE_LIMIT_PREFIX = "rl:"; // Rate limit key prefix
+
+// ------------------------------
+// Input-validation / sanitization helpers
+// ------------------------------
+
+// Usernames: 3-30 characters, letters, numbers, underscore or hyphen
+const USERNAME_REGEX = /^[a-z0-9_-]{3,30}$/i;
+
+// Room IDs generated internally are base-36 alphanumerics; still validate when received from client
+const ROOM_ID_REGEX = /^[a-z0-9]+$/i;
+
+/** Simple HTML-escaping to mitigate XSS when rendering messages */
+const escapeHTML = (str = "") =>
+  str.replace(
+    /[&<>"']/g,
+    (ch) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[ch])
+  );
+
+/** Validate a username string. Throws on failure. */
+function assertValidUsername(username, requestId) {
+  if (!USERNAME_REGEX.test(username)) {
+    logInfo(
+      requestId,
+      `Invalid username format: ${username}. Must match ${USERNAME_REGEX}`
+    );
+    throw new Error("Invalid username format");
+  }
+}
+
+/** Validate a roomId string. Throws on failure. */
+function assertValidRoomId(roomId, requestId) {
+  if (!ROOM_ID_REGEX.test(roomId)) {
+    logInfo(
+      requestId,
+      `Invalid roomId format: ${roomId}. Must match ${ROOM_ID_REGEX}`
+    );
+    throw new Error("Invalid room ID format");
+  }
+}
+
+/**
+ * Hash a password using bcrypt
+ * @param {string} password - The plaintext password
+ * @returns {Promise<string>} - The hashed password
+ */
+const hashPassword = async (password) => {
+  return await bcrypt.hash(password, PASSWORD_BCRYPT_ROUNDS);
+};
+
+/**
+ * Verify a password against a hash
+ * @param {string} password - The plaintext password
+ * @param {string} hash - The bcrypt hash
+ * @returns {Promise<boolean>} - Whether the password matches
+ */
+const verifyPassword = async (password, hash) => {
+  return await bcrypt.compare(password, hash);
+};
+
+/**
+ * Set or update a user's password hash
+ * @param {string} username - The username
+ * @param {string} passwordHash - The bcrypt hash
+ */
+const setUserPasswordHash = async (username, passwordHash) => {
+  const passwordKey = `${PASSWORD_HASH_PREFIX}${username.toLowerCase()}`;
+  await redis.set(passwordKey, passwordHash);
+};
+
+/**
+ * Get a user's password hash
+ * @param {string} username - The username
+ * @returns {Promise<string|null>} - The password hash or null if not set
+ */
+const getUserPasswordHash = async (username) => {
+  const passwordKey = `${PASSWORD_HASH_PREFIX}${username.toLowerCase()}`;
+  return await redis.get(passwordKey);
+};
 
 /**
  * TOKEN ARCHITECTURE:
  *
  * 1. Token Generation:
  *    - Users can generate a token via /api/chat-rooms?action=generateToken
- *    - Tokens have the same TTL as users (30 days)
+ *    - Tokens have the same TTL as users (90 days)
  *    - Only one active token per user (unless force=true is used)
  *
  * 2. Token Refresh:
  *    - Users can refresh tokens via /api/chat-rooms?action=refreshToken
  *    - Requires the old token (even if expired) for validation
- *    - Expired tokens can be used for refresh within a 7-day grace period
+ *    - Expired tokens can be used for refresh within a 365-day (1 year) grace period
  *    - When refreshing, the old token is stored for future grace period use
  *
  * 3. Token Storage:
- *    - Active tokens: "chat:token:{username}" with 30-day TTL
+ *    - Active tokens: "chat:token:{username}" with 90-day TTL
  *    - Last valid tokens: "chat:token:last:{username}" for grace period refresh
- *    - Last valid tokens are stored with extended TTL (37 days total)
+ *    - Last valid tokens are stored with extended TTL (455 days total - 90 days + 365 days grace)
  *
  * 4. Authentication Flow:
  *    - Most endpoints require Bearer token in Authorization header
@@ -92,7 +194,7 @@ const TOKEN_GRACE_PERIOD = 86400 * 7; // 7 days grace period for refresh after e
  *    - Token validation refreshes the token TTL on each successful auth
  *
  * 5. Grace Period:
- *    - After a token expires, users have 7 days to refresh using the expired token
+ *    - After a token expires, users have 365 days (1 year) to refresh using the expired token
  *    - This prevents users from being permanently locked out
  *    - The grace period token data includes when the original token expired
  */
@@ -102,6 +204,183 @@ const TOKEN_GRACE_PERIOD = 86400 * 7; // 7 days grace period for refresh after e
  */
 const generateAuthToken = () => {
   return crypto.randomBytes(TOKEN_LENGTH).toString("hex");
+};
+
+// ---------------------------------------------------------------------------
+// NEW: Multi-token helpers – map each token -> username so that a user can be
+// signed in from multiple devices simultaneously.
+// ---------------------------------------------------------------------------
+
+/** Build the Redis key used for a specific auth token */
+const getTokenKey = (token) => `${AUTH_TOKEN_PREFIX}${token}`;
+
+/** Build the Redis key for user-specific tokens (new pattern) */
+const getUserTokenKey = (username, token) =>
+  `${AUTH_TOKEN_PREFIX}user:${username.toLowerCase()}:${token}`;
+
+/** Get all token keys for a user using pattern matching */
+const getUserTokenPattern = (username) =>
+  `${AUTH_TOKEN_PREFIX}user:${username.toLowerCase()}:*`;
+
+/** Persist a freshly generated token for a user */
+const storeToken = async (username, token) => {
+  if (!token) return;
+  const normalizedUsername = username.toLowerCase();
+
+  // Store in new format: chat:token:user:{username}:{token} -> timestamp
+  await redis.set(
+    getUserTokenKey(normalizedUsername, token),
+    getCurrentTimestamp(),
+    {
+      ex: USER_EXPIRATION_TIME,
+    }
+  );
+
+  // Also store in old format for backward compatibility during migration
+  await redis.set(getTokenKey(token), normalizedUsername, {
+    ex: USER_EXPIRATION_TIME,
+  });
+};
+
+/** Delete a single auth token (e.g. on logout or when refreshing) */
+const deleteToken = async (token) => {
+  if (!token) return;
+
+  // First, find which user owns this token (from old format)
+  const username = await redis.get(getTokenKey(token));
+
+  // Delete from both old and new formats
+  await redis.del(getTokenKey(token));
+
+  if (username) {
+    await redis.del(getUserTokenKey(username, token));
+  }
+};
+
+/** Delete all tokens for a user */
+const deleteAllUserTokens = async (username) => {
+  // Normalise for consistent key access
+  const normalizedUsername = username.toLowerCase();
+
+  let deletedCount = 0;
+
+  // ------------------------------------------------------------
+  // 1. NEW scheme: chat:token:user:{username}:{token}
+  // ------------------------------------------------------------
+  const pattern = getUserTokenPattern(normalizedUsername);
+  const userTokenKeys = [];
+  let cursor = 0;
+
+  do {
+    const [newCursor, foundKeys] = await redis.scan(cursor, {
+      match: pattern,
+      count: 100,
+    });
+    cursor = parseInt(newCursor);
+    userTokenKeys.push(...foundKeys);
+  } while (cursor !== 0);
+
+  if (userTokenKeys.length > 0) {
+    const pipeline = redis.pipeline();
+
+    for (const key of userTokenKeys) {
+      // Extract the raw token value from the key (last segment)
+      const parts = key.split(":");
+      const token = parts[parts.length - 1];
+
+      // Delete new-scheme key
+      pipeline.del(key);
+      // Delete old multi-token mapping for the same token
+      pipeline.del(getTokenKey(token));
+    }
+
+    await pipeline.exec();
+    // Count tokens (not individual Redis key deletions)
+    deletedCount += userTokenKeys.length;
+  }
+
+  // ------------------------------------------------------------
+  // 2. OLD multi-token mapping: chat:token:{token} -> username
+  //    Some very old tokens might exist only in this format (no new-scheme key).
+  // ------------------------------------------------------------
+  cursor = 0;
+  const oldTokenKeysToDelete = [];
+  const oldTokenPattern = `${AUTH_TOKEN_PREFIX}*`;
+
+  do {
+    const [newCursor, foundKeys] = await redis.scan(cursor, {
+      match: oldTokenPattern,
+      count: 100,
+    });
+
+    cursor = parseInt(newCursor);
+
+    for (const key of foundKeys) {
+      // Skip keys we have already handled: new-scheme (contains "user:") and grace-period / legacy keys handled separately
+      if (key.includes(`:${normalizedUsername}:`) || key.includes(":user:"))
+        continue;
+      if (key.startsWith(`${AUTH_TOKEN_PREFIX}last:`)) continue;
+      if (key === `${AUTH_TOKEN_PREFIX}${normalizedUsername}`) continue; // legacy single-token path handled later
+
+      const mappedUser = await redis.get(key);
+      if (mappedUser && mappedUser.toLowerCase() === normalizedUsername) {
+        oldTokenKeysToDelete.push(key);
+      }
+    }
+  } while (cursor !== 0);
+
+  if (oldTokenKeysToDelete.length > 0) {
+    const deleted = await redis.del(...oldTokenKeysToDelete);
+    deletedCount += deleted; // redis.del returns number of keys deleted
+  }
+
+  // ------------------------------------------------------------
+  // 3. Legacy single-token mapping: chat:token:{username}
+  // ------------------------------------------------------------
+  const legacyKey = `${AUTH_TOKEN_PREFIX}${normalizedUsername}`;
+  const legacyDeleted = await redis.del(legacyKey);
+  deletedCount += legacyDeleted;
+
+  // ------------------------------------------------------------
+  // 4. Grace-period token store: chat:token:last:{username}
+  //    Removing this prevents refresh using old tokens after a full logout.
+  // ------------------------------------------------------------
+  const lastTokenKey = `${AUTH_TOKEN_PREFIX}last:${normalizedUsername}`;
+  const lastDeleted = await redis.del(lastTokenKey);
+  deletedCount += lastDeleted;
+
+  return deletedCount;
+};
+
+/** Get all active tokens for a user */
+const getUserTokens = async (username) => {
+  const pattern = getUserTokenPattern(username);
+  const tokens = [];
+  let cursor = 0;
+
+  do {
+    const [newCursor, keys] = await redis.scan(cursor, {
+      match: pattern,
+      count: 100,
+    });
+    cursor = parseInt(newCursor);
+
+    // Extract tokens from keys
+    for (const key of keys) {
+      const parts = key.split(":");
+      const token = parts[parts.length - 1];
+      const timestamp = await redis.get(key);
+      tokens.push({ token, createdAt: timestamp });
+    }
+  } while (cursor !== 0);
+
+  return tokens;
+};
+
+/** Retrieve the username associated with a token (if any) */
+const getUsernameForToken = async (token) => {
+  if (!token) return null;
+  return await redis.get(getTokenKey(token));
 };
 
 /**
@@ -123,53 +402,74 @@ const validateAuth = async (
     return { valid: false };
   }
 
-  const tokenKey = `${AUTH_TOKEN_PREFIX}${username.toLowerCase()}`;
-  const storedToken = await redis.get(tokenKey);
+  const normalizedUsername = username.toLowerCase();
 
-  if (!storedToken) {
-    if (allowExpired) {
-      // Check if we have a record of this token being recently used
-      // We store the last valid token when it's refreshed
-      const lastTokenKey = `${AUTH_TOKEN_PREFIX}last:${username.toLowerCase()}`;
-      const lastTokenData = await redis.get(lastTokenKey);
+  // ---------------------------
+  // 1. NEW preferred path: user-scoped token (chat:token:user:{username}:{token})
+  // ---------------------------
+  const userTokenKey = getUserTokenKey(normalizedUsername, token);
+  const userTokenExists = await redis.exists(userTokenKey);
+  if (userTokenExists) {
+    // Refresh TTL for this token in both formats
+    await redis.expire(userTokenKey, USER_TTL_SECONDS);
+    await redis.expire(getTokenKey(token), USER_TTL_SECONDS);
+    return { valid: true, expired: false };
+  }
 
-      if (lastTokenData) {
-        try {
-          const { token: lastToken, expiredAt } = JSON.parse(lastTokenData);
-          // Allow refresh within grace period (7 days after expiry)
-          const gracePeriodEnd = expiredAt + TOKEN_GRACE_PERIOD * 1000;
+  // ---------------------------
+  // 2. Old multi-token path: token -> username mapping
+  // ---------------------------
+  const mappedUsername = await getUsernameForToken(token);
+  if (mappedUsername && mappedUsername.toLowerCase() === normalizedUsername) {
+    // Refresh TTL for this token
+    await redis.expire(getTokenKey(token), USER_TTL_SECONDS);
+    // Also migrate to new format for future validations
+    await redis.set(userTokenKey, getCurrentTimestamp(), {
+      ex: USER_TTL_SECONDS,
+    });
+    return { valid: true, expired: false };
+  }
 
-          if (lastToken === token && Date.now() < gracePeriodEnd) {
-            logInfo(
-              requestId,
-              `Auth validation: Found recently expired token for user ${username} within grace period`
-            );
-            return { valid: true, expired: true };
-          }
-        } catch (e) {
-          logError(requestId, "Error parsing last token data", e);
+  // ---------------------------
+  // 3. Legacy single-token path (username -> token). Keep for backward compat.
+  // ---------------------------
+  const legacyKey = `${AUTH_TOKEN_PREFIX}${normalizedUsername}`;
+  const storedToken = await redis.get(legacyKey);
+  if (storedToken && storedToken === token) {
+    await redis.expire(legacyKey, USER_TTL_SECONDS);
+    // Migrate to new format
+    await redis.set(userTokenKey, getCurrentTimestamp(), {
+      ex: USER_TTL_SECONDS,
+    });
+    return { valid: true, expired: false };
+  }
+
+  // ---------------------------
+  // 4. Grace-period path – allow refresh of recently expired tokens
+  // ---------------------------
+  if (allowExpired) {
+    const lastTokenKey = `${AUTH_TOKEN_PREFIX}last:${normalizedUsername}`;
+    const lastTokenData = await redis.get(lastTokenKey);
+
+    if (lastTokenData) {
+      try {
+        const { token: lastToken, expiredAt } = JSON.parse(lastTokenData);
+        const gracePeriodEnd = expiredAt + TOKEN_GRACE_PERIOD * 1000;
+        if (lastToken === token && Date.now() < gracePeriodEnd) {
+          logInfo(
+            requestId,
+            `Auth validation: Found expired token for user ${username} within grace period`
+          );
+          return { valid: true, expired: true };
         }
+      } catch (e) {
+        logError(requestId, "Error parsing last token data", e);
       }
     }
-
-    logInfo(
-      requestId,
-      `Auth validation failed: No token found for user ${username}`
-    );
-    return { valid: false };
   }
 
-  if (storedToken !== token) {
-    logInfo(
-      requestId,
-      `Auth validation failed: Invalid token for user ${username}`
-    );
-    return { valid: false };
-  }
-
-  // Refresh token expiration on successful validation
-  await redis.expire(tokenKey, USER_TTL_SECONDS);
-  return { valid: true, expired: false };
+  logInfo(requestId, `Auth validation failed for user ${username}`);
+  return { valid: false };
 };
 
 /**
@@ -205,47 +505,121 @@ const extractAuth = (request) => {
 };
 
 /**
- * Helper to set (or update) a user record **with** an expiry so stale
- * users are automatically evicted by Redis.
+ * Helper to set (or update) a user record WITHOUT expiry.
+ * User records now persist forever.
  */
-const setUserWithTTL = async (username, data) => {
-  await redis.set(`${CHAT_USERS_PREFIX}${username}`, JSON.stringify(data), {
-    ex: USER_TTL_SECONDS,
+const setUser = async (username, data) => {
+  await redis.set(`${CHAT_USERS_PREFIX}${username}`, JSON.stringify(data));
+};
+
+/**
+ * Set user presence in a room with automatic expiration.
+ * This tracks that a user is "online" in a specific room.
+ */
+const setRoomPresence = async (roomId, username) => {
+  const presenceKey = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:${username}`;
+  await redis.set(presenceKey, getCurrentTimestamp(), {
+    ex: ROOM_PRESENCE_TTL_SECONDS,
   });
 };
 
 /**
- * Returns the list of active usernames in a room (based on presence of the
- * user key). Any stale usernames that no longer have a backing user key are
- * pruned from the room set so that future SCARD operations are accurate.
+ * Refresh user presence in a room (extend the TTL).
+ */
+const refreshRoomPresence = async (roomId, username) => {
+  const presenceKey = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:${username}`;
+  // Only refresh if the key exists (user is currently present)
+  const exists = await redis.exists(presenceKey);
+  if (exists) {
+    await redis.expire(presenceKey, ROOM_PRESENCE_TTL_SECONDS);
+  }
+};
+
+/**
+ * Get all users currently present in a room (based on presence TTL).
+ * This replaces the old logic that relied on sets + user existence.
+ */
+const getActiveUsersInRoom = async (roomId) => {
+  const pattern = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:*`;
+  const users = [];
+  let cursor = 0;
+
+  // Use SCAN to iterate through presence keys
+  do {
+    const [newCursor, keys] = await redis.scan(cursor, {
+      match: pattern,
+      count: 100, // Process 100 keys at a time
+    });
+
+    cursor = parseInt(newCursor);
+
+    // Extract usernames from the keys
+    const userBatch = keys.map((key) => {
+      const parts = key.split(":");
+      return parts[parts.length - 1]; // Last part is the username
+    });
+
+    users.push(...userBatch);
+  } while (cursor !== 0);
+
+  return users;
+};
+
+/**
+ * Returns the list of active usernames in a room (based on presence TTL).
+ * This uses the new presence-based system instead of relying on user existence.
+ * Also cleans up the old room user sets for backward compatibility.
  */
 const getActiveUsersAndPrune = async (roomId) => {
+  // Get users based on presence (new system)
+  const activeUsers = await getActiveUsersInRoom(roomId);
+
+  // For backward compatibility, also clean up the old room user sets
+  // This can be removed after a migration period
   const roomUsersKey = `${CHAT_ROOM_USERS_PREFIX}${roomId}`;
-  const usernames = await redis.smembers(roomUsersKey);
+  const oldSetMembers = await redis.smembers(roomUsersKey);
 
-  if (usernames.length === 0) return [];
-
-  // Fetch all user keys in a single round-trip
-  const userKeys = usernames.map((u) => `${CHAT_USERS_PREFIX}${u}`);
-  const userDataList = await redis.mget(...userKeys);
-
-  const activeUsers = [];
-  const staleUsers = [];
-
-  usernames.forEach((username, idx) => {
-    if (userDataList[idx]) {
-      activeUsers.push(username);
-    } else {
-      staleUsers.push(username);
-    }
-  });
-
-  // Remove stale users from the set so counts stay in sync
-  if (staleUsers.length > 0) {
-    await redis.srem(roomUsersKey, ...staleUsers);
+  if (oldSetMembers.length > 0) {
+    // Remove all members from the old set since we're now using presence-based tracking
+    await redis.del(roomUsersKey);
   }
 
   return activeUsers;
+};
+
+/**
+ * Clean up expired presence entries and update room counts.
+ * This can be called periodically to ensure accurate presence counts.
+ */
+const cleanupExpiredPresence = async () => {
+  try {
+    // Get all room keys using SCAN
+    const roomKeys = [];
+    let cursor = 0;
+
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: `${CHAT_ROOM_PREFIX}*`,
+        count: 100, // Process 100 keys at a time
+      });
+
+      cursor = parseInt(newCursor);
+      roomKeys.push(...keys);
+    } while (cursor !== 0);
+
+    for (const roomKey of roomKeys) {
+      const roomId = roomKey.substring(CHAT_ROOM_PREFIX.length);
+      const newCount = await refreshRoomUserCount(roomId);
+      console.log(
+        `[cleanupExpiredPresence] Updated room ${roomId} count to ${newCount}`
+      );
+    }
+
+    return { success: true, roomsUpdated: roomKeys.length };
+  } catch (error) {
+    console.error("[cleanupExpiredPresence] Error:", error);
+    return { success: false, error: error.message };
+  }
 };
 
 /**
@@ -278,22 +652,43 @@ const refreshRoomUserCount = async (roomId) => {
 
 // Add helper to fetch rooms with user list
 async function getDetailedRooms() {
-  const keys = await redis.keys(`${CHAT_ROOM_PREFIX}*`);
-  const roomsData = await redis.mget(...keys);
-  const rooms = await Promise.all(
-    roomsData.map(async (raw) => {
-      if (!raw) return null;
-      const roomObj = typeof raw === "string" ? JSON.parse(raw) : raw;
-      const activeUsers = await getActiveUsersAndPrune(roomObj.id);
-      return { ...roomObj, userCount: activeUsers.length, users: activeUsers };
-    })
-  );
-  return rooms.filter((r) => r !== null);
+  const rooms = [];
+  let cursor = 0;
+
+  // Use SCAN to iterate through room keys
+  do {
+    const [newCursor, keys] = await redis.scan(cursor, {
+      match: `${CHAT_ROOM_PREFIX}*`,
+      count: 100, // Process 100 keys at a time
+    });
+
+    cursor = parseInt(newCursor);
+
+    if (keys.length > 0) {
+      const roomsData = await redis.mget(...keys);
+      const roomBatch = await Promise.all(
+        roomsData.map(async (raw, index) => {
+          if (!raw) return null;
+          const roomObj = typeof raw === "string" ? JSON.parse(raw) : raw;
+          const activeUsers = await getActiveUsersAndPrune(roomObj.id);
+          return {
+            ...roomObj,
+            userCount: activeUsers.length,
+            users: activeUsers,
+          };
+        })
+      );
+      rooms.push(...roomBatch.filter((r) => r !== null));
+    }
+  } while (cursor !== 0);
+
+  return rooms;
 }
 
 // Helper functions
 const generateId = () => {
-  return Math.random().toString(36).substring(2, 15);
+  // 128-bit random identifier encoded as hex (32 chars)
+  return crypto.randomBytes(16).toString("hex");
 };
 
 const getCurrentTimestamp = () => {
@@ -356,11 +751,19 @@ async function ensureUserExists(username, requestId) {
     );
   }
 
+  // Validate allowed characters
+  if (!USERNAME_REGEX.test(username)) {
+    logInfo(
+      requestId,
+      `User check failed: Invalid username format: ${username}`
+    );
+    throw new Error("Invalid username format");
+  }
+
   // Attempt to get existing user
   let userData = await redis.get(userKey);
   if (userData) {
-    logInfo(requestId, `User ${username} exists. Refreshing TTL.`);
-    await redis.expire(userKey, USER_TTL_SECONDS); // Refresh TTL
+    logInfo(requestId, `User ${username} exists.`);
     return parseUserData(userData);
   }
 
@@ -373,8 +776,7 @@ async function ensureUserExists(username, requestId) {
   const created = await redis.setnx(userKey, JSON.stringify(newUser));
 
   if (created) {
-    logInfo(requestId, `User ${username} created successfully. Setting TTL.`);
-    await redis.expire(userKey, USER_TTL_SECONDS);
+    logInfo(requestId, `User ${username} created successfully.`);
     return newUser;
   } else {
     // Race condition: User was created between GET and SETNX. Fetch the existing user.
@@ -384,7 +786,6 @@ async function ensureUserExists(username, requestId) {
     );
     userData = await redis.get(userKey);
     if (userData) {
-      await redis.expire(userKey, USER_TTL_SECONDS); // Refresh TTL just in case
       return parseUserData(userData);
     } else {
       // Should be rare, but handle case where user disappeared again
@@ -419,7 +820,17 @@ export async function GET(request) {
     if (!publicActions.includes(action)) {
       const { username, token } = extractAuth(request);
 
-      // Validate authentication
+      // Special handling for checkPassword - it's a protected action
+      if (action === "checkPassword") {
+        // Validate authentication
+        const isValid = await validateAuth(username, token, requestId);
+        if (!isValid.valid) {
+          return createErrorResponse("Unauthorized", 401);
+        }
+        return await handleCheckPassword(username, requestId);
+      }
+
+      // Validate authentication for other protected actions
       const isValid = await validateAuth(username, token, requestId);
       if (!isValid.valid) {
         return createErrorResponse("Unauthorized", 401);
@@ -477,7 +888,85 @@ export async function GET(request) {
         });
       }
       case "getUsers":
-        return await handleGetUsers(requestId);
+        const searchQuery = url.searchParams.get("search") || "";
+        return await handleGetUsers(requestId, searchQuery);
+      case "cleanupPresence": {
+        // This is an admin-only endpoint for cleaning up expired presence
+        const { username, token } = extractAuth(request);
+        const isValid = await validateAuth(username, token, requestId);
+        if (!isValid.valid || username?.toLowerCase() !== "ryo") {
+          return createErrorResponse(
+            "Unauthorized - Admin access required",
+            403
+          );
+        }
+
+        const result = await cleanupExpiredPresence();
+        if (result.success) {
+          // Broadcast updated room counts
+          await broadcastRoomsUpdated();
+        }
+        return new Response(JSON.stringify(result), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      case "debugPresence": {
+        // Debug endpoint to check presence state
+        const { username, token } = extractAuth(request);
+        const isValid = await validateAuth(username, token, requestId);
+        if (!isValid.valid || username?.toLowerCase() !== "ryo") {
+          return createErrorResponse(
+            "Unauthorized - Admin access required",
+            403
+          );
+        }
+
+        try {
+          // Get all presence keys using SCAN
+          const presenceKeys = [];
+          let cursor = 0;
+
+          do {
+            const [newCursor, keys] = await redis.scan(cursor, {
+              match: `${CHAT_ROOM_PRESENCE_PREFIX}*`,
+              count: 100, // Process 100 keys at a time
+            });
+
+            cursor = parseInt(newCursor);
+            presenceKeys.push(...keys);
+          } while (cursor !== 0);
+
+          const presenceData = {};
+
+          for (const key of presenceKeys) {
+            const value = await redis.get(key);
+            const ttl = await redis.ttl(key);
+            presenceData[key] = { value, ttl };
+          }
+
+          // Get all rooms and their calculated counts
+          const rooms = await getDetailedRooms();
+
+          return new Response(
+            JSON.stringify({
+              presenceKeys: presenceKeys.length,
+              presenceData,
+              rooms: rooms.map((r) => ({
+                id: r.id,
+                name: r.name,
+                userCount: r.userCount,
+                users: r.users,
+              })),
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error) {
+          logError(requestId, "Error in debugPresence:", error);
+          return createErrorResponse("Debug failed", 500);
+        }
+      }
       default:
         logInfo(requestId, `Invalid action: ${action}`);
         return createErrorResponse("Invalid action", 400);
@@ -501,8 +990,40 @@ export async function POST(request) {
   logRequest("POST", request.url, action, requestId);
 
   try {
-    // Parse JSON body
-    const body = await request.json();
+    // Parse JSON body safely – some actions (e.g. logoutAllDevices) send no body
+    let body = {};
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      try {
+        body = await request.json();
+      } catch {
+        // Invalid or empty JSON – treat as empty object to avoid SyntaxError
+        body = {};
+      }
+    }
+
+    // ---------------- Rate limiting ----------------
+    const sensitiveRateLimitActions = new Set([
+      "generateToken",
+      "refreshToken",
+      "authenticateWithPassword",
+      "setPassword",
+      "createUser",
+    ]);
+
+    if (sensitiveRateLimitActions.has(action)) {
+      // prefer username if available, else client IP
+      const identifier = (
+        body.username ||
+        request.headers.get("x-username") ||
+        request.headers.get("x-forwarded-for") ||
+        "anon"
+      ).toLowerCase();
+      const allowed = await checkRateLimit(action, identifier, requestId);
+      if (!allowed) {
+        return createErrorResponse("Too many requests, please slow down", 429);
+      }
+    }
 
     // Declare username and token at function level
     let username = null;
@@ -514,8 +1035,8 @@ export async function POST(request) {
       "joinRoom",
       "leaveRoom",
       "switchRoom",
-      "generateToken",
       "refreshToken",
+      "authenticateWithPassword", // New: password-based auth
     ];
 
     // Actions that specifically require authentication
@@ -524,6 +1045,12 @@ export async function POST(request) {
       "sendMessage",
       "clearAllMessages",
       "resetUserCounts",
+      "verifyToken",
+      "setPassword", // New: set password for existing user
+      "generateToken", // Generating/reissuing tokens now requires authentication
+      "listTokens", // List all active tokens for a user
+      "logoutAllDevices", // Logout from all devices
+      "logoutCurrent", // Logout current session
     ];
 
     // Check authentication for protected actions
@@ -540,7 +1067,8 @@ export async function POST(request) {
         const allowedRyoProxy =
           action === "sendMessage" &&
           body.username.toLowerCase() === "ryo" &&
-          username;
+          username; // any authenticated user may proxy as ryo
+
         if (!allowedRyoProxy) {
           logInfo(
             requestId,
@@ -585,6 +1113,18 @@ export async function POST(request) {
       case "resetUserCounts":
         // Pass authenticated username for admin validation
         return await handleResetUserCounts(username, requestId);
+      case "verifyToken":
+        return await handleVerifyToken(username, requestId);
+      case "authenticateWithPassword":
+        return await handleAuthenticateWithPassword(body, requestId);
+      case "setPassword":
+        return await handleSetPassword(body, username, requestId);
+      case "listTokens":
+        return await handleListTokens(username, request, requestId);
+      case "logoutAllDevices":
+        return await handleLogoutAllDevices(username, request, requestId);
+      case "logoutCurrent":
+        return await handleLogoutCurrent(username, token, requestId);
       default:
         logInfo(requestId, `Invalid action: ${action}`);
         return createErrorResponse("Invalid action", 400);
@@ -695,6 +1235,7 @@ async function handleGetRooms(request, requestId) {
 async function handleGetRoom(roomId, requestId) {
   logInfo(requestId, `Fetching room: ${roomId}`);
   try {
+    assertValidRoomId(roomId, requestId);
     const roomRaw = await redis.get(`${CHAT_ROOM_PREFIX}${roomId}`);
     const roomObj =
       typeof roomRaw === "string"
@@ -817,13 +1358,12 @@ async function handleCreateRoom(data, username, requestId) {
 
     await redis.set(`${CHAT_ROOM_PREFIX}${roomId}`, room);
 
-    // For private rooms, add all members to the room
+    // For private rooms, set presence for all members
     if (type === "private") {
-      const pipeline = redis.pipeline();
-      members.forEach((member) => {
-        pipeline.sadd(`${CHAT_ROOM_USERS_PREFIX}${roomId}`, member);
-      });
-      await pipeline.exec();
+      const presencePromises = members.map((member) =>
+        setRoomPresence(roomId, member)
+      );
+      await Promise.all(presencePromises);
     }
 
     logInfo(requestId, `${type} room created: ${roomId}`);
@@ -904,6 +1444,26 @@ async function handleDeleteRoom(roomId, username, requestId) {
         pipeline.del(`${CHAT_ROOM_PREFIX}${roomId}`);
         pipeline.del(`${CHAT_MESSAGES_PREFIX}${roomId}`);
         pipeline.del(`${CHAT_ROOM_USERS_PREFIX}${roomId}`);
+
+        // Clean up all presence keys for this room
+        const presencePattern = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:*`;
+        const presenceKeys = [];
+        let cursor = 0;
+
+        do {
+          const [newCursor, keys] = await redis.scan(cursor, {
+            match: presencePattern,
+            count: 100,
+          });
+
+          cursor = parseInt(newCursor);
+          presenceKeys.push(...keys);
+        } while (cursor !== 0);
+
+        if (presenceKeys.length > 0) {
+          presenceKeys.forEach((key) => pipeline.del(key));
+        }
+
         await pipeline.exec();
         logInfo(
           requestId,
@@ -922,11 +1482,9 @@ async function handleDeleteRoom(roomId, username, requestId) {
         };
         await redis.set(`${CHAT_ROOM_PREFIX}${roomId}`, updatedRoom);
 
-        // Remove user from active users set
-        await redis.srem(
-          `${CHAT_ROOM_USERS_PREFIX}${roomId}`,
-          username.toLowerCase()
-        );
+        // Remove user presence from room
+        const presenceKey = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:${username.toLowerCase()}`;
+        await redis.del(presenceKey);
 
         logInfo(
           requestId,
@@ -939,6 +1497,26 @@ async function handleDeleteRoom(roomId, username, requestId) {
       pipeline.del(`${CHAT_ROOM_PREFIX}${roomId}`);
       pipeline.del(`${CHAT_MESSAGES_PREFIX}${roomId}`);
       pipeline.del(`${CHAT_ROOM_USERS_PREFIX}${roomId}`);
+
+      // Clean up all presence keys for this room
+      const presencePattern = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:*`;
+      const presenceKeys = [];
+      let cursor = 0;
+
+      do {
+        const [newCursor, keys] = await redis.scan(cursor, {
+          match: presencePattern,
+          count: 100,
+        });
+
+        cursor = parseInt(newCursor);
+        presenceKeys.push(...keys);
+      } while (cursor !== 0);
+
+      if (presenceKeys.length > 0) {
+        presenceKeys.forEach((key) => pipeline.del(key));
+      }
+
       await pipeline.exec();
       logInfo(requestId, `Public room deleted by admin: ${roomId}`);
     }
@@ -976,6 +1554,13 @@ async function handleGetBulkMessages(roomIds, requestId) {
   );
 
   try {
+    // Validate all room IDs
+    for (const id of roomIds) {
+      if (!ROOM_ID_REGEX.test(id)) {
+        return createErrorResponse("Invalid room ID format", 400);
+      }
+    }
+
     // Verify all rooms exist first
     const roomExistenceChecks = await Promise.all(
       roomIds.map((roomId) => redis.exists(`${CHAT_ROOM_PREFIX}${roomId}`))
@@ -1053,6 +1638,7 @@ async function handleGetMessages(roomId, requestId) {
   logInfo(requestId, `Fetching messages for room: ${roomId}`);
 
   try {
+    assertValidRoomId(roomId, requestId);
     const roomExists = await redis.exists(`${CHAT_ROOM_PREFIX}${roomId}`);
 
     if (!roomExists) {
@@ -1114,7 +1700,7 @@ async function handleGetMessages(roomId, requestId) {
 }
 
 async function handleCreateUser(data, requestId) {
-  const { username: originalUsername } = data;
+  const { username: originalUsername, password } = data;
 
   if (!originalUsername) {
     logInfo(requestId, "User creation failed: Username is required");
@@ -1154,10 +1740,25 @@ async function handleCreateUser(data, requestId) {
     );
   }
 
+  // Validate password if provided
+  if (password && password.length < PASSWORD_MIN_LENGTH) {
+    logInfo(
+      requestId,
+      `User creation failed: Password too short: ${password.length} chars (min: ${PASSWORD_MIN_LENGTH})`
+    );
+    return createErrorResponse(
+      `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+      400
+    );
+  }
+
   // Normalize username to lowercase
   const username = originalUsername.toLowerCase();
 
-  logInfo(requestId, `Creating user: ${username}`);
+  logInfo(
+    requestId,
+    `Creating user: ${username}${password ? " with password" : ""}`
+  );
   try {
     // Check if username already exists using setnx for atomicity
     const userKey = `${CHAT_USERS_PREFIX}${username}`;
@@ -1169,9 +1770,84 @@ async function handleCreateUser(data, requestId) {
     const created = await redis.setnx(userKey, JSON.stringify(user));
 
     if (!created) {
-      // User already exists - return conflict error
+      // User already exists - attempt login if password provided
+      if (password) {
+        logInfo(
+          requestId,
+          `Username ${username} exists, attempting authentication with provided password`
+        );
+
+        try {
+          // Get password hash for existing user
+          const passwordHash = await getUserPasswordHash(username);
+
+          if (passwordHash) {
+            // Verify password
+            const isValid = await verifyPassword(password, passwordHash);
+
+            if (isValid) {
+              // Password matches - log them in instead of throwing error
+              logInfo(
+                requestId,
+                `Password correct for existing user ${username}, logging in`
+              );
+
+              // Generate authentication token
+              const authToken = generateAuthToken();
+              const tokenKey = `${AUTH_TOKEN_PREFIX}${username}`;
+
+              // Store token with expiration
+              await redis.set(tokenKey, authToken, {
+                ex: USER_EXPIRATION_TIME,
+              });
+
+              // Get existing user data
+              const existingUserData = await redis.get(userKey);
+              const existingUser = existingUserData
+                ? typeof existingUserData === "string"
+                  ? JSON.parse(existingUserData)
+                  : existingUserData
+                : { username, lastActive: getCurrentTimestamp() };
+
+              logInfo(
+                requestId,
+                `User ${username} authenticated via signup form with correct password`
+              );
+
+              return new Response(
+                JSON.stringify({ user: existingUser, token: authToken }),
+                {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                }
+              );
+            }
+          }
+
+          // Password doesn't match or no password hash found
+          logInfo(
+            requestId,
+            `Authentication failed for existing user ${username} - incorrect password`
+          );
+        } catch (authError) {
+          logError(
+            requestId,
+            `Error during authentication attempt for ${username}:`,
+            authError
+          );
+        }
+      }
+
+      // No password provided or authentication failed - return original error
       logInfo(requestId, `Username already taken: ${username}`);
       return createErrorResponse("Username already taken", 409);
+    }
+
+    // Hash and store password if provided
+    if (password) {
+      const passwordHash = await hashPassword(password);
+      await setUserPasswordHash(username, passwordHash);
+      logInfo(requestId, `Password hash stored for user: ${username}`);
     }
 
     // Generate authentication token
@@ -1181,12 +1857,10 @@ async function handleCreateUser(data, requestId) {
     // Store token with same expiration as user
     await redis.set(tokenKey, authToken, { ex: USER_EXPIRATION_TIME });
 
-    // Set expiration time for the new user
-    await redis.expire(userKey, USER_EXPIRATION_TIME);
-    logInfo(
-      requestId,
-      `User created with 30-day expiration and auth token: ${username}`
-    );
+    // NEW: store token->username mapping to allow multiple concurrent tokens
+    await storeToken(username, authToken);
+
+    logInfo(requestId, `User created with auth token: ${username}`);
 
     return new Response(JSON.stringify({ user, token: authToken }), {
       status: 201,
@@ -1211,6 +1885,13 @@ async function handleJoinRoom(data, requestId) {
     return createErrorResponse("Room ID and username are required", 400);
   }
 
+  try {
+    assertValidUsername(username, requestId);
+    assertValidRoomId(roomId, requestId);
+  } catch (e) {
+    return createErrorResponse(e.message, 400);
+  }
+
   logInfo(requestId, `User ${username} joining room ${roomId}`);
   try {
     // Use Promise.all for concurrent checks
@@ -1229,11 +1910,11 @@ async function handleJoinRoom(data, requestId) {
       return createErrorResponse("User not found", 404);
     }
 
-    // Add user to room set
-    await redis.sadd(`${CHAT_ROOM_USERS_PREFIX}${roomId}`, username);
+    // Set user presence in room with TTL
+    await setRoomPresence(roomId, username);
 
-    // Update room user count - Fetch latest count after adding
-    const userCount = await redis.scard(`${CHAT_ROOM_USERS_PREFIX}${roomId}`);
+    // Update room user count based on presence
+    const userCount = await refreshRoomUserCount(roomId);
     const updatedRoom = { ...roomData, userCount };
     await redis.set(`${CHAT_ROOM_PREFIX}${roomId}`, updatedRoom);
     logInfo(
@@ -1244,12 +1925,7 @@ async function handleJoinRoom(data, requestId) {
     // Update user's last active timestamp
     const updatedUser = { ...userData, lastActive: getCurrentTimestamp() };
     await redis.set(`${CHAT_USERS_PREFIX}${username}`, updatedUser);
-    // Refresh user expiration
-    await redis.expire(`${CHAT_USERS_PREFIX}${username}`, USER_EXPIRATION_TIME);
-    logInfo(
-      requestId,
-      `User ${username} last active time updated and expiration reset to 30 days`
-    );
+    logInfo(requestId, `User ${username} last active time updated`);
 
     // Trigger optimized broadcast to update all clients with new room state
     try {
@@ -1289,6 +1965,13 @@ async function handleLeaveRoom(data, requestId) {
     return createErrorResponse("Room ID and username are required", 400);
   }
 
+  try {
+    assertValidUsername(username, requestId);
+    assertValidRoomId(roomId, requestId);
+  } catch (e) {
+    return createErrorResponse(e.message, 400);
+  }
+
   logInfo(requestId, `User ${username} leaving room ${roomId}`);
   try {
     // Check if room exists and parse data once
@@ -1301,11 +1984,9 @@ async function handleLeaveRoom(data, requestId) {
     const roomObj =
       typeof roomDataRaw === "string" ? JSON.parse(roomDataRaw) : roomDataRaw;
 
-    // Remove user from room set
-    const removed = await redis.srem(
-      `${CHAT_ROOM_USERS_PREFIX}${roomId}`,
-      username
-    );
+    // Remove user presence from room
+    const presenceKey = `${CHAT_ROOM_PRESENCE_PREFIX}${roomId}:${username}`;
+    const removed = await redis.del(presenceKey);
 
     // If user was actually removed, update the count
     if (removed) {
@@ -1433,8 +2114,20 @@ async function handleClearAllMessages(username, requestId) {
   }
 
   try {
-    // Get all message keys
-    const messageKeys = await redis.keys(`${CHAT_MESSAGES_PREFIX}*`);
+    // Get all message keys using SCAN
+    const messageKeys = [];
+    let cursor = 0;
+
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: `${CHAT_MESSAGES_PREFIX}*`,
+        count: 100, // Process 100 keys at a time
+      });
+
+      cursor = parseInt(newCursor);
+      messageKeys.push(...keys);
+    } while (cursor !== 0);
+
     logInfo(
       requestId,
       `Found ${messageKeys.length} message collections to clear`
@@ -1500,8 +2193,20 @@ async function handleResetUserCounts(username, requestId) {
   }
 
   try {
-    // Get all room keys
-    const roomKeys = await redis.keys(`${CHAT_ROOM_PREFIX}*`);
+    // Get all room keys using SCAN
+    const roomKeys = [];
+    let cursor = 0;
+
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: `${CHAT_ROOM_PREFIX}*`,
+        count: 100,
+      });
+
+      cursor = parseInt(newCursor);
+      roomKeys.push(...keys);
+    } while (cursor !== 0);
+
     logInfo(requestId, `Found ${roomKeys.length} rooms to update`);
 
     if (roomKeys.length === 0) {
@@ -1513,16 +2218,47 @@ async function handleResetUserCounts(username, requestId) {
       );
     }
 
-    // Get all room user set keys
-    const roomUserKeys = await redis.keys(`${CHAT_ROOM_USERS_PREFIX}*`);
+    // Get all room user set keys (old system) using SCAN
+    const roomUserKeys = [];
+    cursor = 0;
 
-    // First, clear all room user sets
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: `${CHAT_ROOM_USERS_PREFIX}*`,
+        count: 100,
+      });
+
+      cursor = parseInt(newCursor);
+      roomUserKeys.push(...keys);
+    } while (cursor !== 0);
+
+    // Get all presence keys (new system) using SCAN
+    const presenceKeys = [];
+    cursor = 0;
+
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: `${CHAT_ROOM_PRESENCE_PREFIX}*`,
+        count: 100,
+      });
+
+      cursor = parseInt(newCursor);
+      presenceKeys.push(...keys);
+    } while (cursor !== 0);
+
+    // Clear all room user sets and presence keys
     const deleteRoomUsersPipeline = redis.pipeline();
     roomUserKeys.forEach((key) => {
       deleteRoomUsersPipeline.del(key);
     });
+    presenceKeys.forEach((key) => {
+      deleteRoomUsersPipeline.del(key);
+    });
     await deleteRoomUsersPipeline.exec();
-    logInfo(requestId, `Cleared ${roomUserKeys.length} room user sets`);
+    logInfo(
+      requestId,
+      `Cleared ${roomUserKeys.length} room user sets and ${presenceKeys.length} presence keys`
+    );
 
     // Then update all room objects to set userCount to 0
     const roomsData = await redis.mget(...roomKeys);
@@ -1572,22 +2308,61 @@ async function handleResetUserCounts(username, requestId) {
 }
 
 // User functions
-async function handleGetUsers(requestId) {
-  logInfo(requestId, "Fetching all users");
+async function handleGetUsers(requestId, searchQuery = "") {
+  logInfo(requestId, `Fetching users with search query: "${searchQuery}"`);
   try {
-    const keys = await redis.keys(`${CHAT_USERS_PREFIX}*`);
-    logInfo(requestId, `Found ${keys.length} users`);
-
-    if (keys.length === 0) {
+    // Only search if query is at least 2 characters
+    if (searchQuery.length < 2) {
       return new Response(JSON.stringify({ users: [] }), {
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const usersData = await redis.mget(...keys);
-    const users = usersData.map((user) => user).filter(Boolean);
+    const users = [];
+    let cursor = 0;
+    const maxResults = 20; // Limit results
+    const pattern = `${CHAT_USERS_PREFIX}*${searchQuery.toLowerCase()}*`;
 
-    return new Response(JSON.stringify({ users }), {
+    // Use SCAN instead of KEYS to avoid performance issues
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: pattern,
+        count: 100, // Scan 100 keys at a time
+      });
+
+      cursor = parseInt(newCursor);
+
+      if (keys.length > 0) {
+        const usersData = await redis.mget(...keys);
+        const foundUsers = usersData
+          .map((user) => {
+            try {
+              return typeof user === "string" ? JSON.parse(user) : user;
+            } catch (e) {
+              logError(requestId, "Error parsing user data:", e);
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        users.push(...foundUsers);
+
+        // Stop if we have enough results
+        if (users.length >= maxResults) {
+          break;
+        }
+      }
+    } while (cursor !== 0 && users.length < maxResults);
+
+    // Limit to maxResults
+    const limitedUsers = users.slice(0, maxResults);
+
+    logInfo(
+      requestId,
+      `Found ${limitedUsers.length} users matching "${searchQuery}"`
+    );
+
+    return new Response(JSON.stringify({ users: limitedUsers }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
@@ -1600,20 +2375,24 @@ async function handleSendMessage(data, requestId) {
   const { roomId, username: originalUsername, content: originalContent } = data;
   const username = originalUsername?.toLowerCase(); // Normalize
 
-  if (!roomId || !username || !originalContent) {
-    logInfo(requestId, "Message sending failed: Missing required fields", {
-      roomId,
-      username,
-      hasContent: !!originalContent,
-    });
-    return createErrorResponse(
-      "Room ID, username, and content are required",
-      400
-    );
+  // Validate identifiers early
+  try {
+    assertValidUsername(username, requestId);
+    assertValidRoomId(roomId, requestId);
+  } catch (e) {
+    return createErrorResponse(e.message, 400);
   }
 
-  // Filter profanity from message content AFTER checking username profanity
-  const content = filter.clean(originalContent);
+  if (!originalContent) {
+    logInfo(requestId, "Message sending failed: Content is required", {
+      roomId,
+      username,
+    });
+    return createErrorResponse("Content is required", 400);
+  }
+
+  // Filter profanity then escape HTML to mitigate XSS
+  const content = escapeHTML(filter.clean(originalContent));
 
   logInfo(requestId, `Sending message in room ${roomId} from user ${username}`);
 
@@ -1732,6 +2511,9 @@ async function handleSendMessage(data, requestId) {
     ); // Ensure it's stringified for Redis
     // Refresh expiration time again just to be safe upon activity
     await redis.expire(`${CHAT_USERS_PREFIX}${username}`, USER_EXPIRATION_TIME);
+
+    // Refresh room presence when user sends a message
+    await refreshRoomPresence(roomId, username);
     logInfo(
       requestId,
       `Updated user ${username} last active timestamp and reset expiration`
@@ -1880,6 +2662,14 @@ async function handleSwitchRoom(data, requestId) {
     return createErrorResponse("Username is required", 400);
   }
 
+  // Validate room IDs format if provided
+  try {
+    if (previousRoomId) assertValidRoomId(previousRoomId, requestId);
+    if (nextRoomId) assertValidRoomId(nextRoomId, requestId);
+  } catch (e) {
+    return createErrorResponse(e.message, 400);
+  }
+
   // Nothing to do if IDs are the same (including both null)
   if (previousRoomId === nextRoomId) {
     logInfo(
@@ -1907,18 +2697,26 @@ async function handleSwitchRoom(data, requestId) {
           typeof roomDataRaw === "string"
             ? JSON.parse(roomDataRaw)
             : roomDataRaw;
-        // Skip automatic leave if the previous room is a private chat – users should remain members unless they explicitly leave.
+        // For public rooms, remove presence immediately when switching away
+        // For private rooms, keep presence (they remain "online" until TTL expires)
         if (roomData.type !== "private") {
-          await redis.srem(
-            `${CHAT_ROOM_USERS_PREFIX}${previousRoomId}`,
-            username
+          // Remove presence for public rooms
+          const presenceKey = `${CHAT_ROOM_PRESENCE_PREFIX}${previousRoomId}:${username}`;
+          await redis.del(presenceKey);
+          logInfo(
+            requestId,
+            `Removed presence for user ${username} from room ${previousRoomId}`
           );
           const userCount = await refreshRoomUserCount(previousRoomId);
+          logInfo(
+            requestId,
+            `Updated user count for room ${previousRoomId}: ${userCount}`
+          );
           changedRooms.push({ roomId: previousRoomId, userCount });
         } else {
           logInfo(
             requestId,
-            `Skipping automatic leave for private room ${previousRoomId}`
+            `Keeping presence for private room ${previousRoomId} (will expire via TTL)`
           );
         }
       }
@@ -1933,9 +2731,16 @@ async function handleSwitchRoom(data, requestId) {
         return createErrorResponse("Next room not found", 404);
       }
 
-      await redis.sadd(`${CHAT_ROOM_USERS_PREFIX}${nextRoomId}`, username);
-      const userCount = await redis.scard(
-        `${CHAT_ROOM_USERS_PREFIX}${nextRoomId}`
+      // Set presence in the new room
+      await setRoomPresence(nextRoomId, username);
+      logInfo(
+        requestId,
+        `Set presence for user ${username} in room ${nextRoomId}`
+      );
+      const userCount = await refreshRoomUserCount(nextRoomId);
+      logInfo(
+        requestId,
+        `Updated user count for room ${nextRoomId}: ${userCount}`
       );
 
       // Update room object with new count
@@ -1947,10 +2752,6 @@ async function handleSwitchRoom(data, requestId) {
       await redis.set(
         `${CHAT_USERS_PREFIX}${username}`,
         JSON.stringify({ username, lastActive: getCurrentTimestamp() })
-      );
-      await redis.expire(
-        `${CHAT_USERS_PREFIX}${username}`,
-        USER_EXPIRATION_TIME
       );
 
       changedRooms.push({ roomId: nextRoomId, userCount });
@@ -2009,20 +2810,20 @@ async function handleGenerateToken(data, requestId) {
     // Check if token already exists
     const tokenKey = `${AUTH_TOKEN_PREFIX}${username}`;
     const existingToken = await redis.get(tokenKey);
+    // Multiple tokens per user are now supported; we no longer treat an existing token as an error.
 
     if (existingToken && !force) {
-      logInfo(requestId, `Token already exists for user: ${username}`);
-      return createErrorResponse("Token already exists for this user", 409);
+      // Legacy logic removed: we now allow generating multiple tokens per user.
     }
 
     // Generate new token
     const authToken = generateAuthToken();
 
-    // Store token with same expiration as user
+    // Store token with expiration
     await redis.set(tokenKey, authToken, { ex: USER_EXPIRATION_TIME });
 
-    // Refresh user expiration
-    await redis.expire(userKey, USER_EXPIRATION_TIME);
+    // Persist token->username mapping for multi-token support
+    await storeToken(username, authToken);
 
     logInfo(
       requestId,
@@ -2086,15 +2887,18 @@ async function handleRefreshToken(data, requestId) {
       `Stored old token for future grace period use for user: ${username}`
     );
 
+    // Remove the old token so that it is no longer valid on this device
+    await deleteToken(oldToken);
+
     // Generate new token
     const authToken = generateAuthToken();
 
-    // Store new token with same expiration as user
+    // Store new token with expiration
     const tokenKey = `${AUTH_TOKEN_PREFIX}${username}`;
     await redis.set(tokenKey, authToken, { ex: USER_EXPIRATION_TIME });
 
-    // Refresh user expiration
-    await redis.expire(userKey, USER_EXPIRATION_TIME);
+    // Persist token->username mapping for multi-token support
+    await storeToken(username, authToken);
 
     logInfo(
       requestId,
@@ -2110,6 +2914,28 @@ async function handleRefreshToken(data, requestId) {
   } catch (error) {
     logError(requestId, `Error refreshing token for user ${username}:`, error);
     return createErrorResponse("Failed to refresh token", 500);
+  }
+}
+
+async function handleVerifyToken(username, requestId) {
+  logInfo(requestId, `Verifying token for user: ${username}`);
+
+  try {
+    // If we get here, the token has already been validated by the auth middleware
+    // Just return success with user info
+    return new Response(
+      JSON.stringify({
+        valid: true,
+        username: username,
+        message: "Token is valid",
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    logError(requestId, `Error verifying token for user ${username}:`, error);
+    return createErrorResponse("Failed to verify token", 500);
   }
 }
 
@@ -2147,8 +2973,21 @@ async function broadcastRoomsUpdated() {
       }
     );
 
-    // 2. Per-user channels - parallelize these for better performance
-    const userKeys = await redis.keys(`${CHAT_USERS_PREFIX}*`);
+    // 2. Per-user channels - get all user keys using SCAN
+    const userKeys = [];
+    let cursor = 0;
+
+    do {
+      const [newCursor, keys] = await redis.scan(cursor, {
+        match: `${CHAT_USERS_PREFIX}*`,
+        count: 100, // Process 100 keys at a time
+      });
+
+      cursor = parseInt(newCursor);
+      userKeys.push(...keys);
+    } while (cursor !== 0);
+
+    // Parallelize the user channel broadcasts
     const userChannelPromises = userKeys.map((key) => {
       const username = key.substring(CHAT_USERS_PREFIX.length);
       const safeUsername = sanitizeForChannel(username);
@@ -2213,3 +3052,278 @@ async function broadcastToSpecificUsers(usernames) {
     console.error("[broadcastToSpecificUsers] Failed to broadcast:", err);
   }
 }
+
+// Add these new handler functions after the existing handlers
+
+async function handleAuthenticateWithPassword(data, requestId) {
+  const { username: originalUsername, password, oldToken } = data;
+
+  if (!originalUsername || !password) {
+    logInfo(requestId, "Auth failed: Username and password are required");
+    return createErrorResponse("Username and password are required", 400);
+  }
+
+  // Normalize username to lowercase
+  const username = originalUsername.toLowerCase();
+
+  logInfo(requestId, `Authenticating user with password: ${username}`);
+  try {
+    // Check if user exists
+    const userKey = `${CHAT_USERS_PREFIX}${username}`;
+    const userData = await redis.get(userKey);
+
+    if (!userData) {
+      logInfo(requestId, `User not found: ${username}`);
+      return createErrorResponse("Invalid username or password", 401);
+    }
+
+    // Get password hash
+    const passwordHash = await getUserPasswordHash(username);
+
+    if (!passwordHash) {
+      logInfo(requestId, `No password set for user: ${username}`);
+      return createErrorResponse("Invalid username or password", 401);
+    }
+
+    // Verify password
+    const isValid = await verifyPassword(password, passwordHash);
+
+    if (!isValid) {
+      logInfo(requestId, `Invalid password for user: ${username}`);
+      return createErrorResponse("Invalid username or password", 401);
+    }
+
+    // Remove previous token mapping from this device if provided
+    if (oldToken) {
+      await deleteToken(oldToken);
+      await storeLastValidToken(username, oldToken);
+    }
+
+    // Generate new token
+    const authToken = generateAuthToken();
+    const tokenKey = `${AUTH_TOKEN_PREFIX}${username}`;
+
+    // Store token with expiration
+    await redis.set(tokenKey, authToken, { ex: USER_EXPIRATION_TIME });
+
+    // Persist token -> username mapping
+    await storeToken(username, authToken);
+
+    logInfo(
+      requestId,
+      `Password authentication successful for user ${username}`
+    );
+
+    return new Response(JSON.stringify({ token: authToken, username }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    logError(requestId, `Error authenticating user ${username}:`, error);
+    return createErrorResponse("Failed to authenticate", 500);
+  }
+}
+
+async function handleSetPassword(data, username, requestId) {
+  const { password } = data;
+
+  if (!password) {
+    logInfo(requestId, "Set password failed: Password is required");
+    return createErrorResponse("Password is required", 400);
+  }
+
+  // Validate password length
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    logInfo(
+      requestId,
+      `Set password failed: Password too short: ${password.length} chars (min: ${PASSWORD_MIN_LENGTH})`
+    );
+    return createErrorResponse(
+      `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+      400
+    );
+  }
+
+  logInfo(requestId, `Setting password for user: ${username}`);
+  try {
+    // Hash and store password
+    const passwordHash = await hashPassword(password);
+    await setUserPasswordHash(username, passwordHash);
+
+    logInfo(requestId, `Password set successfully for user ${username}`);
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    logError(requestId, `Error setting password for user ${username}:`, error);
+    return createErrorResponse("Failed to set password", 500);
+  }
+}
+
+async function handleCheckPassword(username, requestId) {
+  logInfo(requestId, `Checking if password is set for user: ${username}`);
+
+  try {
+    const passwordHash = await getUserPasswordHash(username);
+    const hasPassword = !!passwordHash;
+
+    return new Response(
+      JSON.stringify({
+        hasPassword,
+        username: username,
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    logError(requestId, `Error checking password for user ${username}:`, error);
+    return createErrorResponse("Failed to check password status", 500);
+  }
+}
+
+async function handleListTokens(username, request, requestId) {
+  logInfo(requestId, `Listing active tokens for user: ${username}`);
+
+  try {
+    const tokens = await getUserTokens(username);
+
+    // Add information about which token is being used for current request
+    const { token: currentToken } = extractAuth(request);
+
+    const tokenList = tokens.map((t) => ({
+      ...t,
+      isCurrent: t.token === currentToken,
+      // Mask token for security - only show last 8 characters
+      maskedToken: `...${t.token.slice(-8)}`,
+    }));
+
+    logInfo(
+      requestId,
+      `Found ${tokenList.length} active tokens for user ${username}`
+    );
+
+    return new Response(
+      JSON.stringify({
+        tokens: tokenList,
+        count: tokenList.length,
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    logError(requestId, `Error listing tokens for user ${username}:`, error);
+    return createErrorResponse("Failed to list tokens", 500);
+  }
+}
+
+async function handleLogoutAllDevices(username, request, requestId) {
+  logInfo(requestId, `Logging out all devices for user: ${username}`);
+
+  try {
+    // Get current token to exclude it (optional - we could log out all including current)
+    const { token: currentToken } = extractAuth(request);
+
+    // Delete all tokens for the user
+    const deletedCount = await deleteAllUserTokens(username);
+
+    // Optionally: restore current token if we want to keep current session active
+    // await storeToken(username, currentToken);
+
+    logInfo(requestId, `Deleted ${deletedCount} tokens for user ${username}`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Logged out from ${deletedCount} devices`,
+        deletedCount,
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    logError(
+      requestId,
+      `Error logging out all devices for user ${username}:`,
+      error
+    );
+    return createErrorResponse("Failed to logout all devices", 500);
+  }
+}
+
+async function handleLogoutCurrent(username, token, requestId) {
+  logInfo(requestId, `Logging out current session for user: ${username}`);
+
+  try {
+    // Delete the current token for the user
+    await deleteToken(token);
+
+    logInfo(requestId, `Current session logged out for user: ${username}`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Logged out from current session`,
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    logError(
+      requestId,
+      `Error logging out current session for user ${username}:`,
+      error
+    );
+    return createErrorResponse("Failed to logout current session", 500);
+  }
+}
+
+// ------------------------------
+// Rate limiting helpers
+// ------------------------------
+
+/**
+ * Check if an action from a specific identifier is rate limited
+ * @param {string} action - The action being performed
+ * @param {string} identifier - The identifier (username, IP, etc.)
+ * @param {string} requestId - Request ID for logging
+ * @returns {Promise<boolean>} - Whether the action is allowed (true) or rate limited (false)
+ */
+const checkRateLimit = async (action, identifier, requestId) => {
+  try {
+    const key = `${RATE_LIMIT_PREFIX}${action}:${identifier}`;
+    const current = await redis.get(key);
+
+    if (!current) {
+      // First request in window
+      await redis.set(key, 1, { ex: RATE_LIMIT_WINDOW_SECONDS });
+      return true;
+    }
+
+    const count = parseInt(current);
+    if (count >= RATE_LIMIT_ATTEMPTS) {
+      logInfo(
+        requestId,
+        `Rate limit exceeded for ${action} by ${identifier}: ${count} attempts`
+      );
+      return false;
+    }
+
+    // Increment counter
+    await redis.incr(key);
+    return true;
+  } catch (error) {
+    logError(
+      requestId,
+      `Rate limit check failed for ${action}:${identifier}`,
+      error
+    );
+    // On error, allow the request (fail open)
+    return true;
+  }
+};

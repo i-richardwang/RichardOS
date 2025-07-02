@@ -9,6 +9,7 @@ import {
   Trash,
   Volume2,
   Pause,
+  Send,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,12 @@ import {
   type ToolInvocationPart,
 } from "@/components/shared/ToolInvocationMessage";
 import { useChatsStore } from "@/stores/useChatsStore";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // --- Color Hashing for Usernames ---
 const userColors = [
@@ -52,6 +59,25 @@ const getUserColorClass = (username?: string): string => {
   return userColors[hash % userColors.length];
 };
 // --- End Color Hashing ---
+
+// Helper to decode common HTML entities so they render correctly
+const decodeHtmlEntities = (str: string): string => {
+  if (!str) return str;
+  // Prefer DOM-based decoding when available (browser environment)
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    const txt = document.createElement("textarea");
+    txt.innerHTML = str;
+    return txt.value;
+  }
+  // Fallback: basic replacements (covers most common entities)
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+};
 
 // Helper function to parse markdown and segment text
 const parseMarkdown = (
@@ -126,13 +152,13 @@ const getErrorMessage = (error: Error): string => {
         if (errorData.isAuthenticated) {
           return `Daily AI message limit reached.`;
         } else {
-          return `Set a username to continue chatting with Richard.`;
+          return `Login to continue chatting with Richard.`;
         }
       }
 
       // Handle authentication error
       if (errorData.error === "authentication_failed") {
-        return `Session expired. Please set your username again.`;
+        return `Session expired. Please login again.`;
       }
 
       // Return the error field if it exists and is a string
@@ -201,6 +227,7 @@ interface ChatMessagesProps {
   scrollToBottomTrigger: number; // Add scroll trigger prop
   highlightSegment?: { messageId: string; start: number; end: number } | null;
   isSpeaking?: boolean;
+  onSendMessage?: (username: string) => void; // Callback when send message button is clicked
 }
 
 // Component to render the scroll-to-bottom button using the library's context
@@ -242,6 +269,7 @@ interface ChatMessagesContentProps {
   scrollToBottomTrigger: number;
   highlightSegment?: { messageId: string; start: number; end: number } | null;
   isSpeaking?: boolean;
+  onSendMessage?: (username: string) => void;
 }
 
 function ChatMessagesContent({
@@ -259,6 +287,7 @@ function ChatMessagesContent({
   scrollToBottomTrigger,
   highlightSegment,
   isSpeaking,
+  onSendMessage,
 }: ChatMessagesContentProps) {
   const { playNote } = useChatSynth();
   const { playElevatorMusic, stopElevatorMusic, playDingSound } =
@@ -449,10 +478,11 @@ function ChatMessagesContent({
         else if (message.role === "human")
           bgColorClass = getUserColorClass(message.username);
 
-        // Trim leading "!!!!" for urgent messages to match assistant behavior
-        const displayContent = isUrgentMessage(message.content)
+        // Trim leading "!!!!" for urgent messages and decode HTML entities
+        const rawContent = isUrgentMessage(message.content)
           ? message.content.slice(4).trimStart()
           : message.content;
+        const displayContent = decodeHtmlEntities(rawContent);
 
         const combinedHighlightSeg = highlightSegment || localHighlightSegment;
         const combinedIsSpeaking = isSpeaking || localTtsSpeaking;
@@ -491,18 +521,27 @@ function ChatMessagesContent({
               {message.role === "user" && (
                 <>
                   {isAdmin && isRoomView && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{
-                        opacity: hoveredMessageId === messageKey ? 1 : 0,
-                        scale: 1,
-                      }}
-                      className="h-3 w-3 text-gray-400 hover:text-red-600 transition-colors"
-                      onClick={() => deleteMessage(message)}
-                      aria-label="Delete message"
-                    >
-                      <Trash className="h-3 w-3" />
-                    </motion.button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{
+                              opacity: hoveredMessageId === messageKey ? 1 : 0,
+                              scale: 1,
+                            }}
+                            className="h-3 w-3 text-gray-400 hover:text-red-600 transition-colors"
+                            onClick={() => deleteMessage(message)}
+                            aria-label="Delete message"
+                          >
+                            <Trash className="h-3 w-3" />
+                          </motion.button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                   <motion.button
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -681,37 +720,54 @@ function ChatMessagesContent({
                   )}
                 </>
               )}
-              {isRoomView && message.role === "human" && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{
-                    opacity: hoveredMessageId === messageKey ? 1 : 0,
-                    scale: 1,
-                  }}
-                  className="h-3 w-3 text-gray-400 hover:text-gray-600 transition-colors"
-                  onClick={() => copyMessage(message)}
-                  aria-label="Copy message"
-                >
-                  {copiedMessageId === messageKey ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                </motion.button>
-              )}
+              {isRoomView &&
+                message.role === "human" &&
+                onSendMessage &&
+                message.username && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <motion.button
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{
+                            opacity: hoveredMessageId === messageKey ? 1 : 0,
+                            scale: 1,
+                          }}
+                          className="h-3 w-3 text-gray-400 hover:text-blue-600 transition-colors"
+                          onClick={() => onSendMessage(message.username!)}
+                          aria-label="Send message"
+                        >
+                          <Send className="h-3 w-3" />
+                        </motion.button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Message {message.username}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               {isAdmin && isRoomView && message.role !== "user" && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{
-                    opacity: hoveredMessageId === messageKey ? 1 : 0,
-                    scale: 1,
-                  }}
-                  className="h-3 w-3 text-gray-400 hover:text-red-600 transition-colors"
-                  onClick={() => deleteMessage(message)}
-                  aria-label="Delete message"
-                >
-                  <Trash className="h-3 w-3" />
-                </motion.button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{
+                          opacity: hoveredMessageId === messageKey ? 1 : 0,
+                          scale: 1,
+                        }}
+                        className="h-3 w-3 text-gray-400 hover:text-red-600 transition-colors"
+                        onClick={() => deleteMessage(message)}
+                        aria-label="Delete message"
+                      >
+                        <Trash className="h-3 w-3" />
+                      </motion.button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </motion.div>
 
@@ -836,9 +892,10 @@ function ChatMessagesContent({
                           }
                         }
 
-                        const displayContent = isUrgentMessage(part.text)
+                        const rawPartContent = isUrgentMessage(part.text)
                           ? part.text.slice(4).trimStart()
                           : part.text;
+                        const displayContent = decodeHtmlEntities(rawPartContent);
                         const { hasHtml, htmlContent, textContent } =
                           extractHtmlContent(displayContent);
 
@@ -1056,14 +1113,31 @@ function ChatMessagesContent({
       })}
       {error &&
         (() => {
-          // Check if it's a rate limit or username error that's handled elsewhere
           const errorMessage = getErrorMessage(error);
+
+          // Check if it's a rate limit error that's handled elsewhere
           const isRateLimitError =
             errorMessage === "Daily AI message limit reached." ||
             errorMessage === "Set a username to continue chatting with Richard.";
 
           // Don't show these errors in chat since they're handled by other UI
           if (isRateLimitError) return null;
+
+          // Special handling for login message - render in gray like "Start a new conversation?"
+          if (errorMessage === "Login to continue chatting with Ryo.") {
+            return (
+              <motion.div
+                layout="position"
+                key="login-message"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 text-gray-500 font-['Geneva-9'] text-[16px] antialiased h-[12px]"
+              >
+                <MessageSquare className="h-3 w-3" />
+                <span>{errorMessage}</span>
+              </motion.div>
+            );
+          }
 
           return (
             <motion.div
@@ -1111,6 +1185,7 @@ export function ChatMessages({
   scrollToBottomTrigger, // Destructure scroll trigger prop
   highlightSegment,
   isSpeaking,
+  onSendMessage,
 }: ChatMessagesProps) {
   return (
     // Use StickToBottom component as the main container
@@ -1138,6 +1213,7 @@ export function ChatMessages({
           scrollToBottomTrigger={scrollToBottomTrigger}
           highlightSegment={highlightSegment}
           isSpeaking={isSpeaking}
+          onSendMessage={onSendMessage}
         />
       </StickToBottom.Content>
 

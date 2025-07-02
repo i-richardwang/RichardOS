@@ -10,7 +10,10 @@ const getGlobalChannelName = (username?: string | null): string =>
     ? `chats-${username.toLowerCase().replace(/[^a-zA-Z0-9_\-.]/g, "_")}`
     : "chats-public";
 
-export function useChatRoom(isWindowOpen: boolean) {
+export function useChatRoom(
+  isWindowOpen: boolean,
+  onPromptSetUsername?: () => void
+) {
   const {
     username,
     authToken,
@@ -27,7 +30,6 @@ export function useChatRoom(isWindowOpen: boolean) {
     createRoom,
     deleteRoom,
     sendMessage,
-    createUser,
     addMessageToRoom,
     removeMessageFromRoom,
     incrementUnread,
@@ -42,11 +44,7 @@ export function useChatRoom(isWindowOpen: boolean) {
   const roomChannelsRef = useRef<Record<string, PusherChannel>>({});
   const hasInitialized = useRef(false);
 
-  // Dialog states
-  const [isUsernameDialogOpen, setIsUsernameDialogOpen] = useState(false);
-  const [newUsername, setNewUsername] = useState("");
-  const [isSettingUsername, setIsSettingUsername] = useState(false);
-  const [usernameError, setUsernameError] = useState<string | null>(null);
+  // Dialog states (only room-related)
   const [isNewRoomDialogOpen, setIsNewRoomDialogOpen] = useState(false);
   const [isDeleteRoomDialogOpen, setIsDeleteRoomDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<ChatRoom | null>(null);
@@ -233,12 +231,32 @@ export function useChatRoom(isWindowOpen: boolean) {
 
       const result = await sendMessage(currentRoomId, content.trim());
       if (!result.ok) {
-        toast("Error", {
-          description: result.error || "Failed to send message.",
-        });
+        // Check if this is an authentication error
+        const isAuthError =
+          result.error?.toLowerCase().includes("authentication required") ||
+          result.error?.toLowerCase().includes("unauthorized") ||
+          result.error?.toLowerCase().includes("authentication failed") ||
+          result.error?.toLowerCase().includes("username mismatch");
+
+        if (isAuthError) {
+          toast.error("Login Required", {
+            description: "Please login to send messages.",
+            duration: 5000,
+            action: onPromptSetUsername
+              ? {
+                  label: "Login",
+                  onClick: onPromptSetUsername,
+                }
+              : undefined,
+          });
+        } else {
+          toast("Error", {
+            description: result.error || "Failed to send message.",
+          });
+        }
       }
     },
-    [currentRoomId, username, sendMessage]
+    [currentRoomId, username, sendMessage, onPromptSetUsername]
   );
 
   const handleAddRoom = useCallback(
@@ -295,45 +313,7 @@ export function useChatRoom(isWindowOpen: boolean) {
     [isAdmin, deleteRoom, currentRoomId, handleRoomSelect, rooms]
   );
 
-  // --- Username Management ---
-  const handleUsernameSubmit = useCallback(
-    async (submittedUsername: string) => {
-      const trimmedUsername = submittedUsername.trim();
-      if (!trimmedUsername) {
-        return { ok: false, error: "Username cannot be empty." };
-      }
-
-      const result = await createUser(trimmedUsername);
-      if (result.ok) {
-        console.log(`[Username] Set to: ${trimmedUsername}`);
-      }
-      return result;
-    },
-    [createUser]
-  );
-
   // --- Dialog Handlers ---
-  const promptSetUsername = useCallback(() => {
-    setNewUsername("");
-    setUsernameError(null);
-    setIsUsernameDialogOpen(true);
-  }, []);
-
-  const submitUsernameDialog = useCallback(async () => {
-    setIsSettingUsername(true);
-    setUsernameError(null);
-
-    const result = await handleUsernameSubmit(newUsername);
-
-    if (result.ok) {
-      setIsUsernameDialogOpen(false);
-      setNewUsername("");
-    } else {
-      setUsernameError(result.error || "Failed to set username");
-    }
-
-    setIsSettingUsername(false);
-  }, [newUsername, handleUsernameSubmit]);
 
   const promptAddRoom = useCallback(() => {
     setIsNewRoomDialogOpen(true);
@@ -352,9 +332,31 @@ export function useChatRoom(isWindowOpen: boolean) {
       setIsDeleteRoomDialogOpen(false);
       setRoomToDelete(null);
     } else {
-      toast("Error", { description: result.error || "Failed to delete room." });
+      // Check if this is an authentication error
+      const isAuthError =
+        result.error?.toLowerCase().includes("authentication required") ||
+        result.error?.toLowerCase().includes("unauthorized") ||
+        result.error?.toLowerCase().includes("authentication failed") ||
+        result.error?.toLowerCase().includes("username mismatch");
+
+      if (isAuthError) {
+        toast.error("Login Required", {
+          description: "Please login to delete rooms.",
+          duration: 5000,
+          action: onPromptSetUsername
+            ? {
+                label: "Login",
+                onClick: onPromptSetUsername,
+              }
+            : undefined,
+        });
+      } else {
+        toast("Error", {
+          description: result.error || "Failed to delete room.",
+        });
+      }
     }
-  }, [roomToDelete, handleDeleteRoom]);
+  }, [roomToDelete, handleDeleteRoom, onPromptSetUsername]);
 
   // --- Effects ---
 
@@ -465,17 +467,6 @@ export function useChatRoom(isWindowOpen: boolean) {
     handleAddRoom,
     promptAddRoom,
     promptDeleteRoom,
-
-    // Username management
-    promptSetUsername,
-    isUsernameDialogOpen,
-    setIsUsernameDialogOpen,
-    newUsername,
-    setNewUsername,
-    isSettingUsername,
-    usernameError,
-    submitUsernameDialog,
-    setUsernameError,
 
     // Room dialogs
     isNewRoomDialogOpen,

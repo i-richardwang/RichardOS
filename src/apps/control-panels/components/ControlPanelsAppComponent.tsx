@@ -4,6 +4,9 @@ import { ControlPanelsMenuBar } from "./ControlPanelsMenuBar";
 import { HelpDialog } from "@/components/dialogs/HelpDialog";
 import { AboutDialog } from "@/components/dialogs/AboutDialog";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
+import { LoginDialog } from "@/components/dialogs/LoginDialog";
+import { InputDialog } from "@/components/dialogs/InputDialog";
+import { LogoutDialog } from "@/components/dialogs/LogoutDialog";
 import { helpItems, appMetadata } from "..";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -27,6 +30,9 @@ import { setNextBootMessage, clearNextBootMessage } from "@/utils/bootMessage";
 import { AIModel, AI_MODEL_METADATA } from "@/types/aiModels";
 import { VolumeMixer } from "./VolumeMixer";
 import { v4 as uuidv4 } from "uuid";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import React from "react";
 
 interface StoreItem {
   name: string;
@@ -249,6 +255,131 @@ export function ControlPanelsAppComponent({
     setCurrentWallpaper: s.setCurrentWallpaper,
   }));
 
+  // Use auth hook
+  const {
+    username,
+    authToken,
+    promptSetUsername,
+    isUsernameDialogOpen,
+    setIsUsernameDialogOpen,
+    newUsername,
+    setNewUsername,
+    newPassword,
+    setNewPassword,
+    isSettingUsername,
+    usernameError,
+    submitUsernameDialog,
+    promptVerifyToken,
+    isVerifyDialogOpen,
+    setVerifyDialogOpen,
+    verifyPasswordInput,
+    setVerifyPasswordInput,
+    verifyUsernameInput,
+    setVerifyUsernameInput,
+    hasPassword,
+    setPassword,
+    logout,
+    confirmLogout,
+    isLogoutConfirmDialogOpen,
+    setIsLogoutConfirmDialogOpen,
+    isVerifyingToken,
+    verifyError,
+    handleVerifyTokenSubmit,
+  } = useAuth();
+
+  // Password dialog states
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // Log out all devices state
+  const [isLoggingOutAllDevices, setIsLoggingOutAllDevices] = useState(false);
+
+  // Password status is now automatically checked by the store when username/token changes
+
+  // Debug hasPassword value
+  React.useEffect(() => {
+    console.log(
+      "[ControlPanel] hasPassword value:",
+      hasPassword,
+      "type:",
+      typeof hasPassword
+    );
+  }, [hasPassword]);
+
+  const handleSetPassword = async (password: string) => {
+    setIsSettingPassword(true);
+    setPasswordError(null);
+
+    if (!password || password.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
+      setIsSettingPassword(false);
+      return;
+    }
+
+    const result = await setPassword(password);
+
+    if (result.ok) {
+      toast.success("Password Set", {
+        description: "You can now use your password to recover your account",
+      });
+      setIsPasswordDialogOpen(false);
+      setPasswordInput("");
+    } else {
+      setPasswordError(result.error || "Failed to set password");
+    }
+
+    setIsSettingPassword(false);
+  };
+
+  const handleLogoutAllDevices = async () => {
+    setIsLoggingOutAllDevices(true);
+
+    try {
+      // Ensure we have auth info from the auth hook
+      if (!authToken || !username) {
+        toast.error("Authentication Error", {
+          description: "No authentication token found",
+        });
+        return;
+      }
+
+      const response = await fetch("/api/chat-rooms?action=logoutAllDevices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+          "X-Username": username,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success("Logged Out", {
+          description: data.message || "Logged out from all devices",
+        });
+
+        // Immediately clear auth via store logout (bypass confirmation)
+        confirmLogout();
+
+        // No full page reload needed – UI will update via store reset
+      } else {
+        toast.error("Logout Failed", {
+          description: data.error || "Failed to logout from all devices",
+        });
+      }
+    } catch (error) {
+      console.error("Error logging out all devices:", error);
+      toast.error("Network Error", {
+        description: "Failed to connect to server",
+      });
+    } finally {
+      setIsLoggingOutAllDevices(false);
+    }
+  };
+
   // States for previous volume levels for mute/unmute functionality
   const [prevMasterVolume, setPrevMasterVolume] = useState(
     masterVolume > 0 ? masterVolume : 1
@@ -339,17 +470,27 @@ export function ControlPanelsAppComponent({
   };
 
   const performReset = () => {
-    // Preserve file metadata store while clearing everything else
+    // Preserve critical recovery keys while clearing everything else
     const fileMetadataStore = localStorage.getItem("ryos:files");
+    const usernameRecovery = localStorage.getItem("_usr_recovery_key_");
+    const authTokenRecovery = localStorage.getItem("_auth_recovery_key_");
+
     clearAllAppStates();
+
     if (fileMetadataStore) {
       localStorage.setItem("ryos:files", fileMetadataStore);
     }
+    if (usernameRecovery) {
+      localStorage.setItem("_usr_recovery_key_", usernameRecovery);
+    }
+    if (authTokenRecovery) {
+      localStorage.setItem("_auth_recovery_key_", authTokenRecovery);
+    }
+
     window.location.reload();
   };
 
   const handleBackup = async () => {
-
     const backup: {
       localStorage: Record<string, string | null>;
       indexedDB: {
@@ -613,7 +754,9 @@ export function ControlPanelsAppComponent({
             if (filesData.state && filesData.state.items) {
               // Check if any files lack UUIDs
               const fileItems = (
-                Object.values(filesData.state.items) as Array<Record<string, unknown>>
+                Object.values(filesData.state.items) as Array<
+                  Record<string, unknown>
+                >
               ).filter(
                 (item) => !(item as { isDirectory?: boolean }).isDirectory
               );
@@ -820,10 +963,22 @@ export function ControlPanelsAppComponent({
                   path: string,
                   name: string,
                   type: string,
-                  icon: string
+                  icon: string,
+                  existingUuid?: string
                 ) => {
+                  // Helper chooses a UUID to use: prefer existingUuid (from store key) then existing item uuid else generate new
+                  let uuidToUse: string | undefined = existingUuid;
+
+                  if (items[path]) {
+                    uuidToUse = uuidToUse || items[path].uuid;
+                  }
+
+                  if (!uuidToUse) {
+                    uuidToUse = uuidv4();
+                  }
+
                   if (!items[path]) {
-                    const uuid = uuidv4();
+                    // Create new metadata entry
                     items[path] = {
                       path,
                       name,
@@ -831,25 +986,23 @@ export function ControlPanelsAppComponent({
                       type,
                       icon,
                       status: "active",
-                      uuid, // Always generate UUID for restored files
+                      uuid: uuidToUse,
                     };
                     hasChanges = true;
-                    fileUUIDMap.set(name, uuid); // Track for migration
                     console.log(
-                      `[Restore] Created metadata with UUID for: ${path} (${uuid})`
+                      `[Restore] Created metadata for ${path} with UUID ${uuidToUse}`
                     );
                   } else if (!items[path].uuid) {
-                    // File exists but lacks UUID (old backup)
-                    const uuid = uuidv4();
-                    items[path].uuid = uuid;
+                    // Existing metadata without uuid
+                    items[path].uuid = uuidToUse;
                     hasChanges = true;
-                    fileUUIDMap.set(name, uuid); // Track for migration
                     console.log(
-                      `[Restore] Added UUID to existing file: ${path} (${uuid})`
+                      `[Restore] Added UUID ${uuidToUse} to existing metadata for ${path}`
                     );
-                  } else {
-                    // File already has UUID
-                    fileUUIDMap.set(name, items[path].uuid);
+                  }
+
+                  if (uuidToUse) {
+                    fileUUIDMap.set(name, uuidToUse);
                   }
                 };
 
@@ -918,65 +1071,83 @@ export function ControlPanelsAppComponent({
                 }
 
                 // Scan documents store and ensure metadata exists
-                const docsTransaction = db.transaction("documents", "readonly");
-                const docsStore = docsTransaction.objectStore("documents");
-                const docsRequest = docsStore.getAll();
-
                 await new Promise<void>((resolve) => {
-                  docsRequest.onsuccess = () => {
-                    const docs = docsRequest.result;
-                    console.log(
-                      `[Restore] Found ${docs.length} documents in IndexedDB`
-                    );
-                    for (const doc of docs) {
-                      if (doc.name) {
-                        const path = `/Documents/${doc.name}`;
-                        const type = doc.name.endsWith(".md")
+                  const transaction = db.transaction("documents", "readonly");
+                  const store = transaction.objectStore("documents");
+                  const request = store.openCursor();
+
+                  let count = 0;
+                  request.onsuccess = (event) => {
+                    const cursor = (
+                      event.target as IDBRequest<IDBCursorWithValue>
+                    ).result;
+                    if (cursor) {
+                      const key = cursor.key as string;
+                      const value = cursor.value as { name?: string };
+                      if (value.name) {
+                        const path = `/Documents/${value.name}`;
+                        const type = value.name.endsWith(".md")
                           ? "markdown"
                           : "text";
                         ensureFileMetadata(
                           path,
-                          doc.name,
+                          value.name,
                           type,
-                          "/icons/file-text.png"
+                          "/icons/file-text.png",
+                          key
                         );
+                        count++;
                       }
+                      cursor.continue();
+                    } else {
+                      console.log(
+                        `[Restore] Found ${count} documents in IndexedDB`
+                      );
+                      resolve();
                     }
-                    resolve();
                   };
-                  docsRequest.onerror = () => {
+                  request.onerror = () => {
                     console.warn("[Restore] Failed to scan documents store");
                     resolve();
                   };
                 });
 
                 // Scan images store and ensure metadata exists
-                const imagesTransaction = db.transaction("images", "readonly");
-                const imagesStore = imagesTransaction.objectStore("images");
-                const imagesRequest = imagesStore.getAll();
-
                 await new Promise<void>((resolve) => {
-                  imagesRequest.onsuccess = () => {
-                    const images = imagesRequest.result;
-                    console.log(
-                      `[Restore] Found ${images.length} images in IndexedDB`
-                    );
-                    for (const img of images) {
-                      if (img.name) {
-                        const path = `/Images/${img.name}`;
+                  const transaction = db.transaction("images", "readonly");
+                  const store = transaction.objectStore("images");
+                  const request = store.openCursor();
+
+                  let count = 0;
+                  request.onsuccess = (event) => {
+                    const cursor = (
+                      event.target as IDBRequest<IDBCursorWithValue>
+                    ).result;
+                    if (cursor) {
+                      const key = cursor.key as string;
+                      const value = cursor.value as { name?: string };
+                      if (value.name) {
+                        const path = `/Images/${value.name}`;
                         const ext =
-                          img.name.split(".").pop()?.toLowerCase() || "png";
+                          value.name.split(".").pop()?.toLowerCase() || "png";
                         ensureFileMetadata(
                           path,
-                          img.name,
+                          value.name,
                           ext,
-                          "/icons/image.png"
+                          "/icons/image.png",
+                          key
                         );
+                        count++;
                       }
+                      cursor.continue();
+                    } else {
+                      console.log(
+                        `[Restore] Found ${count} images in IndexedDB`
+                      );
+                      resolve();
                     }
-                    resolve();
                   };
-                  imagesRequest.onerror = () => {
+                  request.onerror = () => {
                     console.warn("[Restore] Failed to scan images store");
                     resolve();
                   };
@@ -1363,6 +1534,92 @@ export function ControlPanelsAppComponent({
               className="mt-0 bg-[#E3E3E3] border border-t-0 border-[#808080] h-[calc(100%-2rem)]"
             >
               <div className="space-y-4 h-full overflow-y-auto p-4">
+                {/* User Account Section */}
+                <div className="space-y-2">
+                  {username ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[13px] font-geneva-12 font-medium">
+                            @{username}
+                          </span>
+                          <span className="text-[11px] text-gray-600 font-geneva-12">
+                            Logged in to ryOS
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          {debugMode && (
+                            <Button
+                              variant="retro"
+                              onClick={promptVerifyToken}
+                              className="h-7"
+                            >
+                              Log In
+                            </Button>
+                          )}
+                          {hasPassword === false ? (
+                            <Button
+                              variant="retro"
+                              onClick={() => {
+                                setPasswordInput("");
+                                setPasswordError(null);
+                                setIsPasswordDialogOpen(true);
+                              }}
+                              className="h-7"
+                            >
+                              Set Password
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="retro"
+                              onClick={logout}
+                              className="h-7"
+                            >
+                              Log Out
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {debugMode && (
+                        <div className="flex">
+                          <Button
+                            variant="retro"
+                            onClick={handleLogoutAllDevices}
+                            disabled={isLoggingOutAllDevices}
+                            className="w-full"
+                          >
+                            {isLoggingOutAllDevices
+                              ? "Logging out..."
+                              : "Log Out of All Devices"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[13px] font-geneva-12 font-medium">
+                            ryOS Account
+                          </span>
+                          <span className="text-[11px] text-gray-600 font-geneva-12">
+                            Login to send messages and more.
+                          </span>
+                        </div>
+                        <Button
+                          variant="retro"
+                          onClick={promptSetUsername}
+                          className="h-7"
+                        >
+                          Login
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <hr className="border-gray-400 my-4" />
+
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <Button
@@ -1635,6 +1892,83 @@ export function ControlPanelsAppComponent({
           onConfirm={handleConfirmFormat}
           title="Format File System"
           description="Are you sure you want to format the file system? This will permanently delete all documents (except sample documents), images, and custom wallpapers. Richard OS will restart after format."
+        />
+        {/* Sign Up Dialog (was SetUsernameDialog) */}
+        <LoginDialog
+          initialTab="signup"
+          isOpen={isUsernameDialogOpen}
+          onOpenChange={setIsUsernameDialogOpen}
+          /* Login props (inactive) */
+          usernameInput={verifyUsernameInput}
+          onUsernameInputChange={setVerifyUsernameInput}
+          passwordInput={verifyPasswordInput}
+          onPasswordInputChange={setVerifyPasswordInput}
+          onLoginSubmit={async () => {
+            await handleVerifyTokenSubmit(verifyPasswordInput, true);
+          }}
+          isLoginLoading={isVerifyingToken}
+          loginError={verifyError}
+          /* Sign Up props */
+          newUsername={newUsername}
+          onNewUsernameChange={setNewUsername}
+          newPassword={newPassword}
+          onNewPasswordChange={setNewPassword}
+          onSignUpSubmit={submitUsernameDialog}
+          isSignUpLoading={isSettingUsername}
+          signUpError={usernameError}
+        />
+
+        {/* Log In Dialog */}
+        <LoginDialog
+          isOpen={isVerifyDialogOpen}
+          onOpenChange={setVerifyDialogOpen}
+          /* Login props */
+          usernameInput={verifyUsernameInput}
+          onUsernameInputChange={setVerifyUsernameInput}
+          passwordInput={verifyPasswordInput}
+          onPasswordInputChange={setVerifyPasswordInput}
+          onLoginSubmit={async () => {
+            await handleVerifyTokenSubmit(verifyPasswordInput, true);
+          }}
+          isLoginLoading={isVerifyingToken}
+          loginError={verifyError}
+          /* Sign Up props (inactive) */
+          newUsername={verifyUsernameInput}
+          onNewUsernameChange={setVerifyUsernameInput}
+          newPassword={verifyPasswordInput}
+          onNewPasswordChange={setVerifyPasswordInput}
+          onSignUpSubmit={async () => {
+            setVerifyDialogOpen(false);
+            promptSetUsername();
+          }}
+          isSignUpLoading={false}
+          signUpError={null}
+        />
+        <InputDialog
+          isOpen={isPasswordDialogOpen}
+          onOpenChange={setIsPasswordDialogOpen}
+          onSubmit={handleSetPassword}
+          title="Set Password"
+          description="Set a password to enable account recovery. You can use this password to get a new token if you lose access."
+          value={passwordInput}
+          onChange={(value) => {
+            setPasswordInput(value);
+            setPasswordError(null);
+          }}
+          isLoading={isSettingPassword}
+          errorMessage={passwordError}
+          submitLabel="Set Password"
+        />
+        <LogoutDialog
+          isOpen={isLogoutConfirmDialogOpen}
+          onOpenChange={setIsLogoutConfirmDialogOpen}
+          onConfirm={confirmLogout}
+          hasPassword={hasPassword}
+          onSetPassword={() => {
+            setPasswordInput("");
+            setPasswordError(null);
+            setIsPasswordDialogOpen(true);
+          }}
         />
       </WindowFrame>
     </>

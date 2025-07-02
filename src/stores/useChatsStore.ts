@@ -8,7 +8,7 @@ const USERNAME_RECOVERY_KEY = "_usr_recovery_key_";
 const AUTH_TOKEN_RECOVERY_KEY = "_auth_recovery_key_";
 
 // Token constants
-const TOKEN_REFRESH_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days in ms (weekly refresh)
+const TOKEN_REFRESH_THRESHOLD = 83 * 24 * 60 * 60 * 1000; // 83 days in ms (refresh 7 days before 90-day expiry)
 const TOKEN_LAST_REFRESH_KEY = "_token_refresh_time_";
 
 // API Response Types
@@ -152,6 +152,7 @@ export interface ChatsStoreState {
   // Room State
   username: string | null;
   authToken: string | null; // Authentication token
+  hasPassword: boolean | null; // Whether user has password set (null = unknown/not checked)
   rooms: ChatRoom[];
   currentRoomId: string | null; // ID of the currently selected room, null for AI chat (@richard)
   roomMessages: Record<string, ChatMessage[]>; // roomId -> messages map
@@ -165,6 +166,9 @@ export interface ChatsStoreState {
   setAiMessages: (messages: Message[]) => void;
   setUsername: (username: string | null) => void;
   setAuthToken: (token: string | null) => void; // Set auth token
+  setHasPassword: (hasPassword: boolean | null) => void; // Set password status
+  checkHasPassword: () => Promise<{ ok: boolean; error?: string }>; // Check if user has password
+  setPassword: (password: string) => Promise<{ ok: boolean; error?: string }>; // Set password for user
   setRooms: (rooms: ChatRoom[]) => void;
   setCurrentRoomId: (roomId: string | null) => void;
   setRoomMessagesForCurrentRoom: (messages: ChatMessage[]) => void; // Sets messages for the *current* room
@@ -204,13 +208,17 @@ export interface ChatsStoreState {
     roomId: string,
     content: string
   ) => Promise<{ ok: boolean; error?: string }>;
-  createUser: (username: string) => Promise<{ ok: boolean; error?: string }>;
+  createUser: (
+    username: string,
+    password?: string
+  ) => Promise<{ ok: boolean; error?: string }>;
 
   incrementUnread: (roomId: string) => void;
   clearUnread: (roomId: string) => void;
   setHasEverUsedChats: (value: boolean) => void;
 
   reset: () => void; // Reset store to initial state
+  logout: () => Promise<void>; // Logout and clear all user data
 }
 
 const initialAiMessage: Message = {
@@ -224,9 +232,13 @@ const getInitialState = (): Omit<
   ChatsStoreState,
   | "isAdmin"
   | "reset"
+  | "logout"
   | "setAiMessages"
   | "setUsername"
   | "setAuthToken"
+  | "setHasPassword"
+  | "checkHasPassword"
+  | "setPassword"
   | "setRooms"
   | "setCurrentRoomId"
   | "setRoomMessagesForCurrentRoom"
@@ -258,6 +270,7 @@ const getInitialState = (): Omit<
     aiMessages: [initialAiMessage],
     username: recoveredUsername,
     authToken: recoveredAuthToken,
+    hasPassword: null, // Unknown until checked
     rooms: [],
     currentRoomId: null,
     roomMessages: {},
@@ -288,11 +301,128 @@ export const useChatsStore = create<ChatsStoreState>()(
           // Save username to recovery storage when it's set
           saveUsernameToRecovery(username);
           set({ username });
+
+          // Check password status when username changes (if we have a token)
+          const currentToken = get().authToken;
+          if (username && currentToken) {
+            setTimeout(() => {
+              get().checkHasPassword();
+            }, 100);
+          } else if (!username) {
+            // Clear password status when username is cleared
+            set({ hasPassword: null });
+          }
         },
         setAuthToken: (token) => {
           // Save auth token to recovery storage when it's set
           saveAuthTokenToRecovery(token);
           set({ authToken: token });
+
+          // Check password status when token changes (if we have a username)
+          const currentUsername = get().username;
+          if (token && currentUsername) {
+            setTimeout(() => {
+              get().checkHasPassword();
+            }, 100);
+          } else if (!token) {
+            // Clear password status when token is cleared
+            set({ hasPassword: null });
+          }
+        },
+        setHasPassword: (hasPassword) => {
+          set({ hasPassword });
+        },
+        checkHasPassword: async () => {
+          const currentUsername = get().username;
+          const currentToken = get().authToken;
+
+          if (!currentUsername || !currentToken) {
+            console.log(
+              "[ChatsStore] checkHasPassword: No username or token, setting null"
+            );
+            set({ hasPassword: null });
+            return { ok: false, error: "Authentication required" };
+          }
+
+          console.log(
+            "[ChatsStore] checkHasPassword: Checking for user",
+            currentUsername
+          );
+          try {
+            const response = await fetch(
+              "/api/chat-rooms?action=checkPassword",
+              {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${currentToken}`,
+                  "X-Username": currentUsername,
+                },
+              }
+            );
+
+            console.log(
+              "[ChatsStore] checkHasPassword: Response status",
+              response.status
+            );
+            if (response.ok) {
+              const data = await response.json();
+              console.log("[ChatsStore] checkHasPassword: Result", data);
+              set({ hasPassword: data.hasPassword });
+              return { ok: true };
+            } else {
+              console.log(
+                "[ChatsStore] checkHasPassword: Failed with status",
+                response.status
+              );
+              set({ hasPassword: null });
+              return { ok: false, error: "Failed to check password status" };
+            }
+          } catch (error) {
+            console.error(
+              "[ChatsStore] Error checking password status:",
+              error
+            );
+            set({ hasPassword: null });
+            return {
+              ok: false,
+              error: "Network error while checking password",
+            };
+          }
+        },
+        setPassword: async (password) => {
+          const currentUsername = get().username;
+          const currentToken = get().authToken;
+
+          if (!currentUsername || !currentToken) {
+            return { ok: false, error: "Authentication required" };
+          }
+
+          try {
+            const response = await fetch("/api/chat-rooms?action=setPassword", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${currentToken}`,
+                "X-Username": currentUsername,
+              },
+              body: JSON.stringify({ password }),
+            });
+
+            if (!response.ok) {
+              const data = await response.json();
+              return {
+                ok: false,
+                error: data.error || "Failed to set password",
+              };
+            }
+
+            // Update local state to reflect password has been set
+            set({ hasPassword: true });
+            return { ok: true };
+          } catch (error) {
+            console.error("[ChatsStore] Error setting password:", error);
+            return { ok: false, error: "Network error while setting password" };
+          }
         },
         setRooms: (newRooms) => {
           // Ensure incoming data is an array
@@ -568,7 +698,7 @@ export const useChatsStore = create<ChatsStoreState>()(
           // If token is older than threshold, refresh it
           if (tokenAge > TOKEN_REFRESH_THRESHOLD) {
             console.log(
-              `[ChatsStore] Token is ${tokenAgeDays} days old (weekly refresh due), refreshing...`
+              `[ChatsStore] Token is ${tokenAgeDays} days old (refresh due - 7 days before 90-day expiry), refreshing...`
             );
 
             const refreshResult = await get().refreshAuthToken();
@@ -577,7 +707,7 @@ export const useChatsStore = create<ChatsStoreState>()(
               // Update refresh time on successful refresh
               saveTokenRefreshTime(currentUsername);
               console.log(
-                "[ChatsStore] Token refreshed automatically (weekly refresh)"
+                "[ChatsStore] Token refreshed automatically (7 days before expiry)"
               );
               return { refreshed: true };
             } else {
@@ -590,7 +720,7 @@ export const useChatsStore = create<ChatsStoreState>()(
           } else {
             console.log(
               `[ChatsStore] Token is ${tokenAgeDays} days old, next refresh in ${
-                7 - tokenAgeDays
+                83 - tokenAgeDays
               } days`
             );
             return { refreshed: false };
@@ -609,6 +739,64 @@ export const useChatsStore = create<ChatsStoreState>()(
 
           // Reset the store to initial state (which already tries to recover username and auth token)
           set(getInitialState());
+        },
+        logout: async () => {
+          console.log("[ChatsStore] Logging out user...");
+
+          const currentUsername = get().username;
+          const currentToken = get().authToken;
+
+          // Inform server to invalidate current token if we have auth
+          if (currentUsername && currentToken) {
+            try {
+              await fetch("/api/chat-rooms?action=logoutCurrent", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${currentToken}`,
+                  "X-Username": currentUsername,
+                },
+                body: JSON.stringify({}),
+              });
+            } catch (err) {
+              console.warn(
+                "[ChatsStore] Failed to notify server during logout:",
+                err
+              );
+            }
+          }
+
+          // Clear recovery keys from localStorage
+          localStorage.removeItem(USERNAME_RECOVERY_KEY);
+          localStorage.removeItem(AUTH_TOKEN_RECOVERY_KEY);
+
+          // Clear token refresh time for current user
+          if (currentUsername) {
+            const tokenRefreshKey = `${TOKEN_LAST_REFRESH_KEY}${currentUsername}`;
+            localStorage.removeItem(tokenRefreshKey);
+          }
+
+          // Reset only user-specific data, preserve rooms and messages
+          set((state) => ({
+            ...state,
+            aiMessages: [initialAiMessage],
+            username: null,
+            authToken: null,
+            hasPassword: null,
+            currentRoomId: null,
+          }));
+
+          // Re-fetch rooms to show only public rooms visible to anonymous users
+          try {
+            await get().fetchRooms();
+          } catch (error) {
+            console.error(
+              "[ChatsStore] Error refreshing rooms after logout:",
+              error
+            );
+          }
+
+          console.log("[ChatsStore] User logged out successfully");
         },
         fetchRooms: async () => {
           console.log("[ChatsStore] Fetching rooms...");
@@ -814,6 +1002,14 @@ export const useChatsStore = create<ChatsStoreState>()(
                 }));
                 console.error("[ChatsStore] Error switching rooms:", errorData);
                 // Don't revert the room change on API error, just log it
+              } else {
+                console.log("[ChatsStore] Room switch API call successful");
+                // Immediately refresh rooms to show updated presence counts
+                // This ensures the UI reflects the change immediately rather than waiting for Pusher
+                setTimeout(() => {
+                  console.log("[ChatsStore] Refreshing rooms after switch");
+                  get().fetchRooms();
+                }, 50); // Small delay to let the server finish processing
               }
             } catch (error) {
               console.error(
@@ -1023,7 +1219,7 @@ export const useChatsStore = create<ChatsStoreState>()(
             return { ok: false, error: "Network error. Please try again." };
           }
         },
-        createUser: async (username: string) => {
+        createUser: async (username: string, password?: string) => {
           const trimmedUsername = username.trim();
           if (!trimmedUsername) {
             return { ok: false, error: "Username cannot be empty" };
@@ -1033,7 +1229,7 @@ export const useChatsStore = create<ChatsStoreState>()(
             const response = await fetch("/api/chat-rooms?action=createUser", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username: trimmedUsername }),
+              body: JSON.stringify({ username: trimmedUsername, password }),
             });
 
             if (!response.ok) {
@@ -1055,6 +1251,13 @@ export const useChatsStore = create<ChatsStoreState>()(
                 saveAuthTokenToRecovery(data.token);
                 // Save initial token creation time
                 saveTokenRefreshTime(data.user.username);
+              }
+
+              // Check password status after user creation
+              if (data.token) {
+                setTimeout(() => {
+                  get().checkHasPassword();
+                }, 100); // Small delay to ensure token is set
               }
 
               return { ok: true };
@@ -1095,6 +1298,7 @@ export const useChatsStore = create<ChatsStoreState>()(
         aiMessages: state.aiMessages,
         username: state.username,
         authToken: state.authToken, // Persist auth token
+        hasPassword: state.hasPassword, // Persist password status
         currentRoomId: state.currentRoomId,
         isSidebarVisible: state.isSidebarVisible,
         rooms: state.rooms, // Persist rooms list

@@ -5,11 +5,13 @@ import { ChatsMenuBar } from "./ChatsMenuBar";
 import { HelpDialog } from "@/components/dialogs/HelpDialog";
 import { AboutDialog } from "@/components/dialogs/AboutDialog";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
+import { LogoutDialog } from "@/components/dialogs/LogoutDialog";
 import { InputDialog } from "@/components/dialogs/InputDialog";
 import { CreateRoomDialog } from "./CreateRoomDialog";
 import { helpItems, appMetadata } from "..";
 import { useChatRoom } from "../hooks/useChatRoom";
 import { useAiChat } from "../hooks/useAiChat";
+import { useAuth } from "@/hooks/useAuth";
 import React from "react";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
@@ -25,8 +27,8 @@ import { useRyoChat } from "../hooks/useRyoChat";
 // import { ChevronDown } from "lucide-react";
 // import { motion, AnimatePresence } from "framer-motion";
 import { getPrivateRoomDisplayName } from "@/utils/chat";
-import { useTokenRefresh } from "../hooks/useTokenRefresh";
-import { TokenStatus } from "./TokenStatus";
+import { LoginDialog } from "@/components/dialogs/LoginDialog";
+import { toast } from "sonner";
 
 // Define the expected message structure locally, matching ChatMessages internal type
 interface DisplayMessage extends Omit<UIMessage, "role"> {
@@ -46,12 +48,12 @@ export function ChatsAppComponent({
 }: AppProps) {
   const { aiMessages } = useChatsStore();
 
-  // Automatically check and refresh token if needed
-  useTokenRefresh();
+  // Use auth hook for authentication functionality
+  const authResult = useAuth();
+  const { promptSetUsername } = authResult;
 
-  // Get promptSetUsername from useChatRoom first
-  const chatRoomResult = useChatRoom(isWindowOpen ?? false);
-  const { promptSetUsername } = chatRoomResult;
+  // Get room functionality from useChatRoom
+  const chatRoomResult = useChatRoom(isWindowOpen ?? false, promptSetUsername);
 
   const {
     messages,
@@ -79,10 +81,39 @@ export function ChatsAppComponent({
     needsUsername,
   } = useAiChat(promptSetUsername); // Pass promptSetUsername to useAiChat
 
-  // Destructure the rest of the properties from chatRoomResult
+  // Destructure auth properties from authResult
   const {
     username,
     authToken,
+    isUsernameDialogOpen,
+    setIsUsernameDialogOpen,
+    newUsername,
+    setNewUsername,
+    newPassword,
+    setNewPassword,
+    isSettingUsername,
+    usernameError,
+    submitUsernameDialog,
+    promptVerifyToken,
+    isVerifyDialogOpen,
+    setVerifyDialogOpen,
+    verifyPasswordInput,
+    setVerifyPasswordInput,
+    verifyUsernameInput,
+    setVerifyUsernameInput,
+    isVerifyingToken,
+    verifyError,
+    handleVerifyTokenSubmit,
+    hasPassword,
+    setPassword,
+    logout,
+    confirmLogout,
+    isLogoutConfirmDialogOpen,
+    setIsLogoutConfirmDialogOpen,
+  } = authResult;
+
+  // Destructure room properties from chatRoomResult
+  const {
     rooms,
     currentRoomId,
     currentRoomMessages,
@@ -93,15 +124,6 @@ export function ChatsAppComponent({
     toggleSidebarVisibility,
     handleAddRoom,
     promptAddRoom,
-    // promptDeleteRoom,
-    isUsernameDialogOpen,
-    setIsUsernameDialogOpen,
-    newUsername,
-    setNewUsername,
-    isSettingUsername,
-    usernameError,
-    submitUsernameDialog,
-    setUsernameError,
     isNewRoomDialogOpen,
     setIsNewRoomDialogOpen,
     isDeleteRoomDialogOpen,
@@ -119,6 +141,15 @@ export function ChatsAppComponent({
   const [isAboutDialogOpen, setIsAboutDialogOpen] = useState(false);
   // Add state to trigger scroll in ChatMessages
   const [scrollToBottomTrigger, setScrollToBottomTrigger] = useState(0);
+
+  // Password dialog states
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // Send message dialog state
+  const [prefilledUser, setPrefilledUser] = useState<string>("");
 
   // Safety check: ensure rooms is an array before finding
   const currentRoom =
@@ -311,6 +342,47 @@ export function ChatsAppComponent({
     prevFrameNarrowRef.current = isFrameNarrow;
   }, [isFrameNarrow, sidebarVisibleBool, toggleSidebarVisibility]);
 
+  // Password status is now automatically checked by the store when username/token changes
+
+  // Password setting handler
+  const handleSetPassword = async (password: string) => {
+    setIsSettingPassword(true);
+    setPasswordError(null);
+
+    if (!password || password.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
+      setIsSettingPassword(false);
+      return;
+    }
+
+    const result = await setPassword(password);
+
+    if (result.ok) {
+      toast.success("Password Set", {
+        description: "You can now use your password to recover your account",
+      });
+      setIsPasswordDialogOpen(false);
+      setPasswordInput("");
+    } else {
+      setPasswordError(result.error || "Failed to set password");
+    }
+
+    setIsSettingPassword(false);
+  };
+
+  // Function to open password setting dialog
+  const promptSetPassword = useCallback(() => {
+    setPasswordInput("");
+    setPasswordError(null);
+    setIsPasswordDialogOpen(true);
+  }, []);
+
+  // Function to handle send message button click
+  const handleSendMessage = useCallback((username: string) => {
+    setPrefilledUser(username);
+    setIsNewRoomDialogOpen(true);
+  }, []);
+
   if (!isWindowOpen) return null;
 
   // Explicitly type the array using the local DisplayMessage interface
@@ -352,6 +424,17 @@ export function ChatsAppComponent({
         onResetFontSize={handleResetFontSize}
         username={username}
         authToken={authToken} // Pass authToken to ChatsMenuBar
+        onVerifyToken={promptVerifyToken}
+        isVerifyDialogOpen={isVerifyDialogOpen}
+        setVerifyDialogOpen={setVerifyDialogOpen}
+        verifyPasswordInput={verifyPasswordInput}
+        setVerifyPasswordInput={setVerifyPasswordInput}
+        verifyUsernameInput={verifyUsernameInput}
+        setVerifyUsernameInput={setVerifyUsernameInput}
+        isVerifyingToken={isVerifyingToken}
+        verifyError={verifyError}
+        handleVerifyTokenSubmit={handleVerifyTokenSubmit}
+        onLogout={logout}
       />
       <WindowFrame
         title={
@@ -501,18 +584,15 @@ export function ChatsAppComponent({
                   */}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Token status indicator */}
-                  {username && authToken && <TokenStatus />}
-
-                  {/* Set Username button shown only in @richard view when no username is set */}
+                  {/* Create Account button shown only in @richard view when no username is set */}
                   {!currentRoom && !username && (
                     <Button
                       variant="ghost"
                       onClick={promptSetUsername}
                       className="flex items-center gap-1 px-2 py-1 h-7"
                     >
-                      <span className="font-geneva-12 text-[11px]">
-                        Set Username
+                      <span className="font-geneva-12 text-[11px] text-orange-600 hover:text-orange-700">
+                        Login to ryOS
                       </span>
                     </Button>
                   )}
@@ -564,11 +644,12 @@ export function ChatsAppComponent({
                     scrollToBottomTrigger={scrollToBottomTrigger}
                     highlightSegment={highlightSegment}
                     isSpeaking={isSpeaking}
+                    onSendMessage={handleSendMessage}
                   />
                 </div>
-                {/* Input Area or Set Username Prompt */}
+                {/* Input Area or Create Account Prompt */}
                 <div className="absolute bottom-0 z-10 w-full p-2">
-                  {/* Show "Set Username" button in two cases:
+                  {/* Show "Create Account" button in two cases:
                       1. In a chat room without username
                       2. In @richard chat when rate limit is hit for anonymous users */}
                   {(currentRoomId && !username) ||
@@ -577,7 +658,7 @@ export function ChatsAppComponent({
                       onClick={promptSetUsername}
                       className="w-full h-9 font-geneva-12 text-[12px] bg-orange-600 text-white hover:bg-orange-700 transition-all duration-200"
                     >
-                      {"Set Username to Chat"}
+                      {"Login to Chat"}
                     </Button>
                   ) : (
                     // AI Chat or in a room with username set
@@ -641,31 +722,46 @@ export function ChatsAppComponent({
           value={saveFileName}
           onChange={setSaveFileName}
         />
-        <InputDialog
+        <LoginDialog
+          initialTab="signup"
           isOpen={isUsernameDialogOpen}
           onOpenChange={(open) => {
             console.log(
-              `[ChatApp Debug] Username InputDialog onOpenChange called with: ${open}`
+              `[ChatApp Debug] Username LoginDialog onOpenChange called with: ${open}`
             );
             setIsUsernameDialogOpen(open);
           }}
-          onSubmit={submitUsernameDialog}
-          title="Set Username"
-          description="Set your Richard OS username to continue chatting"
-          value={newUsername}
-          onChange={(value) => {
-            setNewUsername(value);
-            setUsernameError(null);
+          /* Login props (not used in sign-up but required) */
+          usernameInput={verifyUsernameInput}
+          onUsernameInputChange={setVerifyUsernameInput}
+          passwordInput={verifyPasswordInput}
+          onPasswordInputChange={setVerifyPasswordInput}
+          onLoginSubmit={async () => {
+            await handleVerifyTokenSubmit(verifyPasswordInput, true);
           }}
-          isLoading={isSettingUsername}
-          errorMessage={usernameError}
+          isLoginLoading={isVerifyingToken}
+          loginError={verifyError}
+          /* Sign-up props */
+          newUsername={newUsername}
+          onNewUsernameChange={setNewUsername}
+          newPassword={newPassword}
+          onNewPasswordChange={setNewPassword}
+          onSignUpSubmit={submitUsernameDialog}
+          isSignUpLoading={isSettingUsername}
+          signUpError={usernameError}
         />
         <CreateRoomDialog
           isOpen={isNewRoomDialogOpen}
-          onOpenChange={setIsNewRoomDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPrefilledUser(""); // Reset prefilled user when dialog closes
+            }
+            setIsNewRoomDialogOpen(open);
+          }}
           onSubmit={handleAddRoom}
           isAdmin={isAdmin}
           currentUsername={username}
+          initialUsers={prefilledUser ? [prefilledUser] : []}
         />
         <ConfirmDialog
           isOpen={isDeleteRoomDialogOpen}
@@ -681,6 +777,28 @@ export function ChatsAppComponent({
               ? `Are you sure you want to leave "${roomToDelete.name}"? You will no longer see messages in this conversation.`
               : `Are you sure you want to delete the room "${roomToDelete?.name}"? This action cannot be undone.`
           }
+        />
+        <LogoutDialog
+          isOpen={isLogoutConfirmDialogOpen}
+          onOpenChange={setIsLogoutConfirmDialogOpen}
+          onConfirm={confirmLogout}
+          hasPassword={hasPassword}
+          onSetPassword={promptSetPassword}
+        />
+        <InputDialog
+          isOpen={isPasswordDialogOpen}
+          onOpenChange={setIsPasswordDialogOpen}
+          onSubmit={handleSetPassword}
+          title="Set Password"
+          description="Set a password to enable account recovery. You can use this password to get a new token if you lose access."
+          value={passwordInput}
+          onChange={(value) => {
+            setPasswordInput(value);
+            setPasswordError(null);
+          }}
+          isLoading={isSettingPassword}
+          errorMessage={passwordError}
+          submitLabel="Set Password"
         />
       </WindowFrame>
     </>

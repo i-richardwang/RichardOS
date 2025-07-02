@@ -1,26 +1,18 @@
 {
   "videos": [
     {
-      "id": "11cta61wi0g",
-      "url": "https://www.youtube.com/watch?v=11cta61wi0g",
-      "title": "Hype Boy",
-      "artist": "NewJeans",
-      "lyricOffset": 1000
+      "id": "YvVDPNOScAw",
+      "url": "https://www.youtube.com/watch?v=YvVDPNOScAw",
+      "title": "Second Emotion",
+      "artist": "Justin Bieber",
+      "lyricOffset": 900
     },
     {
-    "id": "cmlERpyGmYI",
-    "url": "https://www.youtube.com/watch?v=cmlERpyGmYI",
-    "title": "COME DANCE",
-    "artist": "劉柏辛",
-    "lyricOffset": 1800
-  },
-    {
-      "id": "lNmBNXR5mKk",
-      "url": "https://www.youtube.com/watch?v=lNmBNXR5mKk",
-      "title": "Midnight Mirage",
-      "artist": "RIIZE",
-      "album": "ODYSSEY - The 1st Album",
-      "lyricOffset": 1200
+      "id": "cmlERpyGmYI",
+      "url": "https://www.youtube.com/watch?v=cmlERpyGmYI",
+      "title": "COME DANCE",
+      "artist": "劉柏辛",
+      "lyricOffset": 1800
     },
     {
       "id": "JFoevPP8hxY",
@@ -350,14 +342,6 @@
       "lyricOffset": -7000
     },
     {
-      "id": "3SoYkCAzMBk",
-      "url": "https://www.youtube.com/watch?v=3SoYkCAzMBk",
-      "title": "Can We Talk",
-      "artist": "Tevin Campbell",
-      "album": "I'm Ready",
-      "lyricOffset": -300
-    },
-    {
       "id": "ZncbtRo7RXs",
       "url": "https://www.youtube.com/watch?v=ZncbtRo7RXs",
       "title": "Supernatural (Part.1)",
@@ -429,6 +413,13 @@
       "lyricOffset": 1200
     },
     {
+      "id": "RNBiaZbFGII",
+      "url": "https://www.youtube.com/watch?v=RNBiaZbFGII",
+      "title": "come again",
+      "artist": "m-flo",
+      "lyricOffset": -5450
+    },
+    {
       "id": "D3IDK_R1LTg",
       "url": "https://www.youtube.com/watch?v=D3IDK_R1LTg",
       "title": "Every Heart-ミンナノキモチ-",
@@ -473,14 +464,6 @@
       "title": "Skrr",
       "artist": "DEAN & HANNI",
       "lyricOffset": 1400
-    },
-    {
-      "id": "3JWTaaS7LdU",
-      "url": "https://www.youtube.com/watch?v=3JWTaaS7LdU",
-      "title": "I Will Always Love You",
-      "artist": "Whitney Houston",
-      "album": "The Bodyguard (Original Soundtrack Album)",
-      "lyricOffset": 400
     },
     {
       "id": "bX33UI9ZPLk",

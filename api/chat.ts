@@ -18,8 +18,7 @@ import { SUPPORTED_AI_MODELS } from "../src/types/aiModels";
 import { appIds } from "../src/config/appIds";
 import {
   checkAndIncrementAIMessageCount,
-  ANONYMOUS_AI_LIMIT,
-  DAILY_USER_AI_LIMIT,
+  AI_LIMIT_PER_5_HOURS,
 } from "./utils/rate-limit";
 import { Redis } from "@upstash/redis";
 
@@ -368,8 +367,8 @@ const redis = new Redis({
 // Add auth validation function
 const AUTH_TOKEN_PREFIX = "chat:token:";
 const TOKEN_LAST_PREFIX = "chat:token:last:";
-const USER_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
-const TOKEN_GRACE_PERIOD = 7 * 24 * 60 * 60; // 7 days
+const USER_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days (for tokens only)
+const TOKEN_GRACE_PERIOD = 365 * 24 * 60 * 60; // 365 days (1 year)
 
 async function validateAuthToken(
   username: string | undefined | null,
@@ -380,13 +379,23 @@ async function validateAuthToken(
   }
 
   const normalizedUsername = username.toLowerCase();
-  const tokenKey = `${AUTH_TOKEN_PREFIX}${normalizedUsername}`;
-  const storedToken = await redis.get(tokenKey);
+  // 1) First, try the new token->username mapping
+  const directKey = `${AUTH_TOKEN_PREFIX}${authToken}`;
+  const mappedUsername = await redis.get(directKey);
+  if (
+    mappedUsername &&
+    String(mappedUsername).toLowerCase() === normalizedUsername
+  ) {
+    await redis.expire(directKey, USER_TTL_SECONDS);
+    return { valid: true };
+  }
 
-  // Check if current token is valid
+  // 2) Fallback to legacy single-token mapping (username -> token)
+  const legacyKey = `${AUTH_TOKEN_PREFIX}${normalizedUsername}`;
+  const storedToken = await redis.get(legacyKey);
+
   if (storedToken && storedToken === authToken) {
-    // Refresh token expiration on successful validation (30 days)
-    await redis.expire(tokenKey, USER_TTL_SECONDS);
+    await redis.expire(legacyKey, USER_TTL_SECONDS);
     return { valid: true };
   }
 
@@ -425,7 +434,12 @@ async function validateAuthToken(
         );
 
         // Store the new token
-        await redis.set(tokenKey, newToken, { ex: USER_TTL_SECONDS });
+        await redis.set(legacyKey, newToken, { ex: USER_TTL_SECONDS });
+
+        // Also store the mapping for multi-token support
+        await redis.set(`${AUTH_TOKEN_PREFIX}${newToken}`, normalizedUsername, {
+          ex: USER_TTL_SECONDS,
+        });
 
         return { valid: true, newToken };
       }
@@ -468,15 +482,26 @@ export default async function handler(req: Request) {
 
     const {
       messages,
-      systemState: incomingSystemState, // Renamed to allow mutation
+      systemState: incomingSystemState, // still passed for dynamic prompt generation but NOT for auth
       model: bodyModel = DEFAULT_MODEL,
     } = await req.json();
 
     // Use query parameter if available, otherwise use body parameter
     const model = queryModel || bodyModel;
 
+    // ---------------------------
+    // Extract auth headers FIRST so we can use username for logging
+    // ---------------------------
+
+    const authHeaderInitial = req.headers.get("authorization");
+    const headerAuthTokenInitial =
+      authHeaderInitial && authHeaderInitial.startsWith("Bearer ")
+        ? authHeaderInitial.substring(7)
+        : null;
+    const headerUsernameInitial = req.headers.get("x-username");
+
     // Helper: prefix log lines with username (for easier tracing)
-    const usernameForLogs = incomingSystemState?.username ?? "unknown";
+    const usernameForLogs = headerUsernameInitial ?? "unknown";
     const log = (...args: unknown[]) =>
       console.log(`[User: ${usernameForLogs}]`, ...args);
     const logError = (...args: unknown[]) =>
@@ -502,16 +527,29 @@ export default async function handler(req: Request) {
 
     log(`Request origin: ${origin}, IP: ${ip}`);
 
-    // Check rate limits
-    const username = incomingSystemState?.username;
-    const authToken = incomingSystemState?.authToken;
+    // ---------------------------
+    // Authentication extraction
+    // ---------------------------
+    // Prefer credentials in the incoming system state (back-compat),
+    // but fall back to HTTP headers for multi-token support (Authorization & X-Username)
 
-    // Validate authentication first
+    const headerAuthToken = headerAuthTokenInitial ?? undefined;
+    const headerUsername = headerUsernameInitial;
+
+    const username = headerUsername || null;
+    const authToken: string | undefined = headerAuthToken;
+
+    // ---------------------------
+    // Rate-limit & auth checks
+    // ---------------------------
+    // Validate authentication (all users, including "ryo", must present a valid token)
     const validationResult = await validateAuthToken(username, authToken);
 
-    // If username is provided but auth is invalid, reject the request
+    // If a username was provided but the token is missing/invalid, reject the request early
     if (username && !validationResult.valid) {
-      log(`Authentication failed for claimed user: ${username}`);
+      console.log(
+        `[User: ${username}] Authentication failed – invalid or missing token`
+      );
       return new Response(
         JSON.stringify({
           error: "authentication_failed",
@@ -529,7 +567,8 @@ export default async function handler(req: Request) {
 
     // Use validated auth status for rate limiting
     const isAuthenticated = validationResult.valid;
-    const identifier = isAuthenticated ? username!.toLowerCase() : `anon:${ip}`;
+    const identifier =
+      isAuthenticated && username ? username.toLowerCase() : `anon:${ip}`;
 
     // Only check rate limits for user messages (not system messages)
     const userMessages = messages.filter(
@@ -552,9 +591,7 @@ export default async function handler(req: Request) {
           isAuthenticated,
           count: rateLimitResult.count,
           limit: rateLimitResult.limit,
-          message: isAuthenticated
-            ? `You've hit your daily limit of ${DAILY_USER_AI_LIMIT} messages. Come back tomorrow.`
-            : `You've hit the limit of ${ANONYMOUS_AI_LIMIT} messages. Set a username to continue.`,
+          message: `You've hit your limit of ${AI_LIMIT_PER_5_HOURS} messages in this 5-hour window. Please wait a few hours and try again.`,
         };
 
         return new Response(JSON.stringify(errorResponse), {
@@ -614,26 +651,45 @@ export default async function handler(req: Request) {
     const approxTokens = staticSystemPrompt.length / 4; // rough estimate
     log(`Approximate prompt tokens: ${Math.round(approxTokens)}`);
 
+    // -------------------------------------------------------------
+    // System messages – first the LARGE static prompt (cached),
+    // then the smaller dynamic prompt (not cached)
+    // -------------------------------------------------------------
+
+    // 1) Static system instructions – mark as cacheable so Anthropic
+    // can reuse this costly prefix across calls (min-1024-token rule)
+    const staticSystemMessage = {
+      role: "system" as const,
+      content: staticSystemPrompt,
+      ...CACHE_CONTROL_OPTIONS, // { providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } } }
+    };
+
+    // 2) Dynamic, user-specific system state (don't cache)
     const dynamicSystemMessage = {
-      role: "system",
+      role: "system" as const,
       content: generateDynamicSystemPrompt(systemState),
-      ...CACHE_CONTROL_OPTIONS,
     };
 
     // Keep only the last 10 messages for AI context (UI still shows full history)
     const recentMessages = messages.slice(-10);
-    const enrichedMessages = [dynamicSystemMessage, ...recentMessages];
+    const enrichedMessages = [
+      staticSystemMessage,
+      dynamicSystemMessage,
+      ...recentMessages,
+    ];
 
     // Log all messages right before model call (as per user preference)
     enrichedMessages.forEach((msg, index) => {
       log(
-        `Message ${index} [${msg.role}]: ${msg.content?.substring(0, 100)}...`
+        `Message ${index} [${msg.role}]: ${String(msg.content).substring(
+          0,
+          100
+        )}...`
       );
     });
 
     const result = streamText({
       model: selectedModel,
-      system: staticSystemPrompt,
       messages: enrichedMessages,
       tools: {
         launchApp: {
