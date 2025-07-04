@@ -39,6 +39,18 @@ export function FunFactsAppComponent({
   const [facts, setFacts] = useState<FunFact[]>([]);
   const [currentFact, setCurrentFact] = useState<FunFact | null>(null);
   const [animationKey, setAnimationKey] = useState(0);
+  const [shuffledFacts, setShuffledFacts] = useState<FunFact[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Shuffle array function
+  const shuffleArray = (array: FunFact[]) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
 
   // Load fun facts data
   useEffect(() => {
@@ -48,10 +60,12 @@ export function FunFactsAppComponent({
         const data: FunFactsData = await response.json();
         setFacts(data.facts);
         
-        // Set initial random fact
+        // Create shuffled version and set initial fact
         if (data.facts.length > 0) {
-          const randomFact = data.facts[Math.floor(Math.random() * data.facts.length)];
-          setCurrentFact(randomFact);
+          const shuffled = shuffleArray(data.facts);
+          setShuffledFacts(shuffled);
+          setCurrentFact(shuffled[0]);
+          setCurrentIndex(0);
         }
       } catch (error) {
         console.error("Failed to load fun facts:", error);
@@ -61,13 +75,24 @@ export function FunFactsAppComponent({
     loadFacts();
   }, []);
 
-  // Get next random fact
+  // Get next fact from shuffled array
   const getNextFact = () => {
-    if (facts.length === 0) return;
+    if (shuffledFacts.length === 0) return;
     
-    const randomIndex = Math.floor(Math.random() * facts.length);
-    const nextFact = facts[randomIndex];
-    setCurrentFact(nextFact);
+    // Move to next fact in shuffled array
+    const nextIndex = (currentIndex + 1) % shuffledFacts.length;
+    
+    // If we've gone through all facts, reshuffle
+    if (nextIndex === 0) {
+      const newShuffled = shuffleArray(facts);
+      setShuffledFacts(newShuffled);
+      setCurrentFact(newShuffled[0]);
+      setCurrentIndex(0);
+    } else {
+      setCurrentFact(shuffledFacts[nextIndex]);
+      setCurrentIndex(nextIndex);
+    }
+    
     setAnimationKey(prev => prev + 1);
   };
 
@@ -141,7 +166,7 @@ export function FunFactsAppComponent({
               <div className="mt-4 md:mt-6">
                 <Button
                   onClick={getNextFact}
-                  disabled={facts.length === 0}
+                  disabled={shuffledFacts.length === 0}
                   className={cn(
                     "flex items-center space-x-2 px-3 md:px-4 py-2 font-geneva-12 text-black",
                     "bg-system7-button-bg hover:bg-system7-button-hover",
