@@ -36,7 +36,7 @@ interface WordPressCategory {
   parent: number;
 }
 
-// 内部博客文章接口
+// Internal blog post interface
 export interface BlogPost {
   id: number;
   title: string;
@@ -49,7 +49,7 @@ export interface BlogPost {
   author: string;
 }
 
-// 分类接口
+// Category interface
 export interface BlogCategory {
   id: number;
   name: string;
@@ -57,7 +57,7 @@ export interface BlogCategory {
   count: number;
 }
 
-// WordPress API 调用函数
+// WordPress API call functions
 export async function fetchWordPressPosts(): Promise<BlogPost[]> {
   try {
     const response = await fetch(
@@ -70,7 +70,7 @@ export async function fetchWordPressPosts(): Promise<BlogPost[]> {
     
     const wpPosts: WordPressPost[] = await response.json();
     
-    // 转换为内部格式
+    // Convert to internal format
     const posts: BlogPost[] = wpPosts.map((post) => ({
       id: post.id,
       title: post.title.rendered.replace(/&#8217;/g, "'").replace(/&#8216;/g, "'"),
@@ -79,7 +79,7 @@ export async function fetchWordPressPosts(): Promise<BlogPost[]> {
       date: new Date(post.date).toLocaleDateString(),
       slug: post.slug,
       categories: post.categories,
-      author: 'Richard Wang', // 可以根据需要从 author API 获取
+      author: 'Richard Wang', // Can be obtained from author API if needed
     }));
     
     return posts;
@@ -101,7 +101,7 @@ export async function fetchWordPressCategories(): Promise<BlogCategory[]> {
     
     const wpCategories: WordPressCategory[] = await response.json();
     
-    // 转换为内部格式
+    // Convert to internal format
     const categories: BlogCategory[] = wpCategories.map((cat) => ({
       id: cat.id,
       name: cat.name,

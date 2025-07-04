@@ -155,7 +155,7 @@ function extractTabsFromDOM(tabContainer: HTMLElement): TabData[] {
     }
     
   } catch (error) {
-    console.error('提取tabs时出错:', error);
+    console.error('Error extracting tabs:', error);
   }
   
   return tabs;

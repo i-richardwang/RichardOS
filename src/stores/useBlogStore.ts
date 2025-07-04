@@ -7,7 +7,7 @@ import {
   type BlogCategory 
 } from "@/apps/blog/utils/blogApi";
 
-// 重新导出类型
+// Re-export types
 export type { BlogPost, BlogCategory };
 
 interface BlogData {
@@ -18,15 +18,15 @@ interface BlogData {
   searchQuery: string;
   filteredPosts: BlogPost[];
   
-  // UI状态
+  // UI state
   isSidebarVisible: boolean;
   
-  // 加载状态
+  // Loading state
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
   
-  // 缓存管理
+  // Cache management
   lastFetchTime: number | null;
 }
 
@@ -60,7 +60,7 @@ export interface BlogState extends BlogData {
 
 const CURRENT_BLOG_STORE_VERSION = 4;
 
-// 缓存过期时间：4小时
+// Cache expiration time: 4 hours
 const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
 export const useBlogStore = create<BlogState>()(
@@ -72,7 +72,7 @@ export const useBlogStore = create<BlogState>()(
 
       setSelectedCategory: (categoryId) => {
         set({ selectedCategory: categoryId });
-        // 更新过滤后的文章列表
+        // Update filtered articles list
         const { posts, searchQuery } = get();
         const filtered = posts.filter((post) => {
           const matchesCategory = !categoryId || post.categories.includes(categoryId);
@@ -86,7 +86,7 @@ export const useBlogStore = create<BlogState>()(
 
       setSearchQuery: (query) => {
         set({ searchQuery: query });
-        // 更新过滤后的文章列表
+        // Update filtered articles list
         const { posts, selectedCategory } = get();
         const filtered = posts.filter((post) => {
           const matchesCategory = !selectedCategory || post.categories.includes(selectedCategory);
@@ -126,7 +126,7 @@ export const useBlogStore = create<BlogState>()(
           set({ categories });
         } catch (error) {
           console.error('Failed to load categories:', error);
-          // 分类加载失败不阻塞主流程
+          // Category loading failure should not block main process
         }
       },
 
@@ -137,12 +137,12 @@ export const useBlogStore = create<BlogState>()(
 
         const { posts, lastFetchTime } = get();
         
-        // 检查缓存是否有效（4小时内）
+        // Check if cache is valid (within 4 hours)
         const isCacheValid = lastFetchTime && 
           (Date.now() - lastFetchTime) < CACHE_DURATION;
         
         if (posts.length > 0 && isCacheValid) {
-          // 缓存有效，直接使用
+          // Cache is valid, use directly
           set({ 
             isInitialized: true,
             filteredPosts: posts 
@@ -150,7 +150,7 @@ export const useBlogStore = create<BlogState>()(
           return;
         }
 
-        // 缓存无效或为空，重新加载
+        // Cache is invalid or empty, reload
         set({ isLoading: true, error: null });
         try {
           await Promise.all([
@@ -167,7 +167,7 @@ export const useBlogStore = create<BlogState>()(
       },
 
       refreshPosts: async () => {
-        // 强制刷新，忽略缓存
+        // Force refresh, ignore cache
         set({ isLoading: true, error: null });
         try {
           await Promise.all([
@@ -190,14 +190,14 @@ export const useBlogStore = create<BlogState>()(
         categories: state.categories,
         isSidebarVisible: state.isSidebarVisible,
         lastFetchTime: state.lastFetchTime,
-        // 只持久化数据和UI偏好，不保存用户的搜索和选择状态
+        // Only persist data and UI preferences, don't save user search and selection state
       }),
       onRehydrateStorage: () => {
         return (state, error) => {
           if (error) {
             console.error("Error rehydrating Blog store:", error);
           } else if (state) {
-            // 当 store 重新水化时，自动初始化博客数据
+            // Auto-initialize blog data when store rehydrates
             setTimeout(() => {
               state.initializeBlog().catch((err) =>
                 console.error("Failed to initialize blog on rehydrate", err)

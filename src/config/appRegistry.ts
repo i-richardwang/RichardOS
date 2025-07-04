@@ -14,6 +14,7 @@ import { IpodApp } from "@/apps/ipod";
 import { TerminalApp } from "@/apps/terminal";
 import { ProjectsApp } from "@/apps/projects";
 import { BlogApp } from "@/apps/blog";
+import { FunFactsApp } from "@/apps/fun-facts";
 import { appIds } from "./appIds";
 import type {
   BaseApp,
@@ -161,6 +162,13 @@ export const appRegistry = {
     windowConfig: {
       defaultSize: { width: 900, height: 650 },
       minSize: { width: 700, height: 500 },
+    } as WindowConstraints,
+  },
+  [FunFactsApp.id]: {
+    ...FunFactsApp,
+    windowConfig: {
+      defaultSize: { width: 650, height: 450 },
+      minSize: { width: 480, height: 350 },
     } as WindowConstraints,
   },
 } as const;

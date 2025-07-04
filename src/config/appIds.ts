@@ -15,6 +15,7 @@ export const appIds = [
   "control-panels",
   "projects",
   "blog",
+  "fun-facts",
 ] as const;
 
 export type AppId = typeof appIds[number]; 

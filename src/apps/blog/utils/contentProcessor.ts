@@ -1,4 +1,4 @@
-// WordPress 内容处理工具
+// WordPress content processing utility
 export class WordPressContentProcessor {
   private baseUrl: string;
 
@@ -7,34 +7,34 @@ export class WordPressContentProcessor {
   }
 
   /**
-   * 处理图片路径，确保所有图片都使用绝对路径
+   * Process image paths to ensure all images use absolute paths
    */
   private processImages(content: string): string {
-    // 处理相对路径的图片
+    // Process relative path images
     content = content.replace(
       /<img([^>]*?)src=['"](\/[^'"]*)['"]/g,
       `<img$1src="${this.baseUrl}$2"`
     );
 
-    // 处理 WordPress 上传目录的图片（相对路径）
+    // Process WordPress upload directory images (relative paths)
     content = content.replace(
       /<img([^>]*?)src=['"](wp-content\/uploads\/[^'"]*)['"]/g,
       `<img$1src="${this.baseUrl}/$2"`
     );
 
-    // 处理可能已经是完整 URL 但协议不对的图片
+    // Process images that might already be full URLs but with wrong protocol
     content = content.replace(
       /<img([^>]*?)src=['"]http:\/\/imrichard\.com([^'"]*)['"]/g,
       `<img$1src="https://imrichard.com$2"`
     );
 
-    // 处理图片 srcset 属性
+    // Process image srcset attributes
     content = content.replace(
       /srcset=['"](wp-content\/uploads\/[^'"]*)['"]/g,
       `srcset="${this.baseUrl}/$1"`
     );
 
-    // 处理 WordPress 图片的 data-src 属性（懒加载）- 修复相对路径
+    // Process WordPress image data-src attributes (lazy loading) - fix relative paths
     content = content.replace(
       /data-src=['"](\/[^'"]*)['"]/g,
       `data-src="${this.baseUrl}$1"`
@@ -45,19 +45,19 @@ export class WordPressContentProcessor {
       `data-src="${this.baseUrl}/$1"`
     );
 
-    // 修复懒加载图片：将 data-src 的内容复制到 src，移除占位符
+    // Fix lazy loading images: copy data-src content to src, remove placeholder
     content = content.replace(
       /<img([^>]*?)src=['"]data:image[^'"]*['"]([^>]*?)data-src=['"]([^'"]+)['"]([^>]*?)>/g,
       '<img$1src="$3"$2$4>'
     );
 
-    // 处理没有 src 但有 data-src 的图片
+    // Process images without src but with data-src
     content = content.replace(
       /<img([^>]*?)data-src=['"]([^'"]+)['"]([^>]*?)(?!.*src=)/g,
       '<img$1src="$2"$3>'
     );
 
-    // 处理 srcset 中的相对路径和协议问题
+    // Process relative paths and protocol issues in srcset
     content = content.replace(
       /srcset=['"]([^'"]*)['"]/g,
       (_, srcset) => {
@@ -69,27 +69,27 @@ export class WordPressContentProcessor {
       }
     );
 
-    // 智能处理图片的内联样式：保留width设置，移除其他可能干扰的样式
+    // Smart processing of image inline styles: preserve width settings, remove other potentially interfering styles
     content = content.replace(
       /<img([^>]*?)style=['"]([^'"]*)['"]([^>]*?)>/g,
       (match, before, style, after) => {
-        // 如果样式包含 width 属性，则保留整个 style 属性
-        // 这些通常是在WordPress后台手动调整过尺寸的图片
+        // If style contains width attribute, preserve the entire style attribute
+        // These are usually images manually resized in WordPress backend
         if (style.includes('width:')) {
           return match;
         }
-        // 否则，移除 style 属性以避免布局干扰
+        // Otherwise, remove style attribute to avoid layout interference
         return `<img${before}${after}>`;
       }
     );
 
-    // 处理 WordPress 图片包装器
+    // Process WordPress image wrappers
     content = content.replace(
       /<figure class="wp-block-image[^"]*"[^>]*>/g,
       '<figure class="wp-block-image">'
     );
 
-    // 移除 noscript 标签中的重复图片
+    // Remove duplicate images in noscript tags
     content = content.replace(
       /<noscript><img[^>]*><\/noscript>/g,
       ''
@@ -99,7 +99,7 @@ export class WordPressContentProcessor {
   }
 
   /**
-   * 处理链接，确保内链和相对链接都指向正确的域名
+   * Process links to ensure internal links and relative links point to correct domain
    */
   private processLinks(content: string): string {
     // 处理相对路径的链接（以 / 开头）
@@ -124,10 +124,10 @@ export class WordPressContentProcessor {
   }
 
   /**
-   * 处理基础的 WordPress shortcodes
+   * Process basic WordPress shortcodes
    */
   private processShortcodes(content: string): string {
-    // 移除不支持的 shortcodes
+    // Remove unsupported shortcodes
     content = content.replace(/\[caption[^\]]*\](.*?)\[\/caption\]/gs, '$1');
     content = content.replace(/\[gallery[^\]]*\]/g, '');
     content = content.replace(/\[embed[^\]]*\](.*?)\[\/embed\]/gs, '$1');
@@ -136,13 +136,13 @@ export class WordPressContentProcessor {
   }
 
   /**
-   * 清理和规范化 HTML
+   * Clean and normalize HTML
    */
   private cleanupHTML(content: string): string {
-    // 移除空的段落标签
+    // Remove empty paragraph tags
     content = content.replace(/<p[^>]*>\s*<\/p>/g, '');
     
-    // 保护代码块中的空白字符，先用占位符替换
+    // Protect whitespace in code blocks, replace with placeholders first
     const codeBlocks: string[] = [];
     content = content.replace(/<pre[^>]*>[\s\S]*?<\/pre>/g, (match) => {
       const index = codeBlocks.length;
@@ -150,7 +150,7 @@ export class WordPressContentProcessor {
       return `__CODE_BLOCK_${index}__`;
     });
     
-    // 保护行内代码中的空白字符
+    // Protect whitespace in inline code
     const inlineCodes: string[] = [];
     content = content.replace(/<code[^>]*>.*?<\/code>/g, (match) => {
       const index = inlineCodes.length;
@@ -158,21 +158,21 @@ export class WordPressContentProcessor {
       return `__INLINE_CODE_${index}__`;
     });
     
-    // 现在可以安全地清理其他地方的空白字符
+    // Now safely clean whitespace in other places
     content = content.replace(/\s+/g, ' ');
     content = content.replace(/>\s+</g, '><');
     
-    // 恢复代码块
+    // Restore code blocks
     codeBlocks.forEach((codeBlock, index) => {
       content = content.replace(`__CODE_BLOCK_${index}__`, codeBlock);
     });
     
-    // 恢复行内代码
+    // Restore inline code
     inlineCodes.forEach((inlineCode, index) => {
       content = content.replace(`__INLINE_CODE_${index}__`, inlineCode);
     });
     
-    // 确保代码块的正确格式和类名
+    // Ensure correct format and class names for code blocks
     content = content.replace(/<pre([^>]*)><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g, 
       '<pre class="wp-block-code"$1><code$2>$3</code></pre>');
     
@@ -180,12 +180,12 @@ export class WordPressContentProcessor {
   }
 
   /**
-   * 处理文章内容
+   * Process article content
    */
   public processContent(content: string): string {
     if (!content) return '';
     
-    // 按顺序处理内容
+    // Process content in sequence
     content = this.processImages(content);
     content = this.processLinks(content);
     content = this.processShortcodes(content);
@@ -195,15 +195,15 @@ export class WordPressContentProcessor {
   }
 
   /**
-   * 处理文章摘要
+   * Process article excerpt
    */
   public processExcerpt(excerpt: string): string {
     if (!excerpt) return '';
     
-    // 移除 HTML 标签，只保留纯文本
+    // Remove HTML tags, keep only plain text
     let cleaned = excerpt.replace(/<[^>]*>/g, '');
     
-    // 解码 HTML 实体
+    // Decode HTML entities
     cleaned = cleaned.replace(/&quot;/g, '"');
     cleaned = cleaned.replace(/&#8217;/g, "'");
     cleaned = cleaned.replace(/&#8216;/g, "'");

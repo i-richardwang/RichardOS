@@ -1,6 +1,6 @@
 /* ====================================
    Blog Content Styles
-   WordPress博客内容的渲染样式
+   WordPress blog content rendering styles
    ==================================== */
 
 .blog-content {
@@ -14,7 +14,7 @@
 }
 
 /* ====================================
-   标题样式
+   Heading styles
    ==================================== */
 .blog-content h1,
 .blog-content h2,
@@ -37,7 +37,7 @@
 .blog-content h6 { font-size: 14px; }
 
 /* ====================================
-   基础元素样式
+   Basic element styles
    ==================================== */
 /* 段落和文本 */
 .blog-content p {
@@ -46,9 +46,9 @@
 }
 
 /* ====================================
-   图片和媒体样式
+   Image and media styles
    ==================================== */
-/* 图片样式 */
+/* Image styles */
 .blog-content img {
   max-width: 100% !important;
   height: auto !important;
@@ -60,7 +60,7 @@
   object-fit: contain;
 }
 
-/* 限定尺寸图片的容器样式 */
+/* Container styles for size-constrained images */
 .blog-content .wp-block-image.is-resized {
   display: table;
   margin-left: auto;
