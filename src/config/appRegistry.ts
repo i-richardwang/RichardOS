@@ -14,6 +14,7 @@ import { IpodApp } from "@/apps/ipod";
 import { TerminalApp } from "@/apps/terminal";
 import { ProjectsApp } from "@/apps/projects";
 import { BlogApp } from "@/apps/blog";
+import { CinemaDeskApp } from "@/apps/cinema-desk";
 import { FunFactsApp } from "@/apps/fun-facts";
 import { appIds } from "./appIds";
 import type {
@@ -162,6 +163,13 @@ export const appRegistry = {
     windowConfig: {
       defaultSize: { width: 900, height: 650 },
       minSize: { width: 700, height: 500 },
+    } as WindowConstraints,
+  },
+  [CinemaDeskApp.id]: {
+    ...CinemaDeskApp,
+    windowConfig: {
+      defaultSize: { width: 720, height: 720 },
+      minSize: { width: 600, height: 600 },
     } as WindowConstraints,
   },
   [FunFactsApp.id]: {

@@ -15,6 +15,7 @@ export const appIds = [
   "control-panels",
   "projects",
   "blog",
+  "cinema-desk",
   "fun-facts",
 ] as const;
 

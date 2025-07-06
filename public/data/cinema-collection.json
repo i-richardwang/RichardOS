@@ -1,0 +1,56 @@
+{
+  "monthlyRecommendations": [
+    {
+      "id": "tt5687612",
+      "imdbId": "tt5687612",
+      "title": "Fleabag",
+      "type": "series",
+      "imdbRating": 8.7,
+      "year": 2016,
+      "director": "Phoebe Waller-Bridge",
+      "thumbnailUrl": "https://media.themoviedb.org/t/p/w300_and_h450_bestv2/27vEYsRKa3eAniwmoccOoluEXQ1.jpg",
+      "posterUrl": "https://media.themoviedb.org/t/p/w780/27vEYsRKa3eAniwmoccOoluEXQ1.jpg",
+      "recommendedMonth": "2019-03",
+      "classicQuote": "You know that feeling when a person you like doesn't like you back? That's what it's like to be friends with me."
+    },
+    {
+      "id": "tt7278862",
+      "imdbId": "tt7278862",
+      "title": "My Brilliant Friend",
+      "type": "series",
+      "imdbRating": 8.4,
+      "year": 2018,
+      "director": "Saverio Costanzo",
+      "thumbnailUrl": "https://media.themoviedb.org/t/p/w300_and_h450_bestv2/g5RRVWURaevcsiNFvBBEMav88PC.jpg",
+      "posterUrl": "https://media.themoviedb.org/t/p/w780/g5RRVWURaevcsiNFvBBEMav88PC.jpg",
+      "recommendedMonth": "2019-02",
+      "classicQuote": "Friendship is not a comfort, it's a demanding, difficult thing."
+    },
+    {
+      "id": "tt2358891",
+      "imdbId": "tt2358891",
+      "title": "The Great Beauty",
+      "type": "movie",
+      "imdbRating": 7.7,
+      "year": 2013,
+      "director": "Paolo Sorrentino",
+      "thumbnailUrl": "https://media.themoviedb.org/t/p/w300_and_h450_bestv2/1cmOc3ZPkuCTOTqHEsRr3Pk81Um.jpg",
+      "posterUrl": "https://media.themoviedb.org/t/p/w780/1cmOc3ZPkuCTOTqHEsRr3Pk81Um.jpg",
+      "recommendedMonth": "2023-07",
+      "classicQuote": "I was looking for the great beauty but didn't find her."
+    },
+    {
+      "id": "tt0359950",
+      "imdbId": "tt0359950",
+      "title": "The Secret Life of Walter Mitty",
+      "type": "movie",
+      "imdbRating": 7.3,
+      "year": 2013,
+      "director": "Ben Stiller",
+      "thumbnailUrl": "https://media.themoviedb.org/t/p/w300_and_h450_bestv2/tY6ypjKOOtujhxiSwTmvA4OZ5IE.jpg",
+      "posterUrl": "https://media.themoviedb.org/t/p/w780/tY6ypjKOOtujhxiSwTmvA4OZ5IE.jpg",
+      "recommendedMonth": "2025-05",
+      "classicQuote": "Beautiful things don't ask for attention."
+    }
+  ]
+}

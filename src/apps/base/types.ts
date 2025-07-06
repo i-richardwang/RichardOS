@@ -37,6 +37,7 @@ export interface BaseApp<TInitialData = unknown> {
     | "terminal"
     | "projects"
     | "blog"
+    | "cinema-desk"
     | "fun-facts";
   name: string;
   icon: string | { type: "image"; src: string };

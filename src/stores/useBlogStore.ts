@@ -58,7 +58,7 @@ export interface BlogState extends BlogData {
   refreshPosts: () => Promise<void>;
 }
 
-const CURRENT_BLOG_STORE_VERSION = 4;
+const CURRENT_BLOG_STORE_VERSION = 1;
 
 // Cache expiration time: 4 hours
 const CACHE_DURATION = 4 * 60 * 60 * 1000;
