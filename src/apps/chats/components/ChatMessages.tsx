@@ -35,6 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { LinkPreview } from "@/components/shared/LinkPreview";
 
 // --- Color Hashing for Usernames ---
 const userColors = [
@@ -134,6 +135,12 @@ const segmentText = (
 const isEmojiOnly = (text: string): boolean => {
   const emojiRegex = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+$/u;
   return emojiRegex.test(text);
+};
+
+const isUrlOnly = (text: string): boolean => {
+  const trimmedText = text.trim();
+  const urlRegex = /^https?:\/\/[^\s]+$/;
+  return urlRegex.test(trimmedText);
 };
 
 // Helper function to extract user-friendly error message
@@ -301,6 +308,11 @@ function ChatMessagesContent({
   const [isInteractingWithPreview, setIsInteractingWithPreview] =
     useState(false);
 
+  // Helper to detect if we're on a touch device
+  const isTouchDevice = () => {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  };
+
   // Local highlight state for manual speech triggered from this component
   const [localHighlightSegment, setLocalHighlightSegment] = useState<{
     messageId: string;
@@ -442,6 +454,20 @@ function ChatMessagesContent({
 
   const isUrgentMessage = (content: string) => content.startsWith("!!!!");
 
+  // Helper function to extract URLs from message content for link previews
+  const extractUrls = (content: string): string[] => {
+    const urls = new Set<string>();
+    const tokens = segmentText(content);
+    
+    tokens.forEach(token => {
+      if (token.type === "link" && token.url) {
+        urls.add(token.url);
+      }
+    });
+    
+    return Array.from(urls);
+  };
+
   // Return the message list rendering logic
   return (
     <AnimatePresence initial={false} mode="sync">
@@ -508,11 +534,22 @@ function ChatMessagesContent({
                 message.role === "user" ? "bottom right" : "bottom left",
             }}
             onMouseEnter={() =>
-              !isInteractingWithPreview && setHoveredMessageId(messageKey)
+              !isInteractingWithPreview && !isTouchDevice() && setHoveredMessageId(messageKey)
             }
             onMouseLeave={() =>
-              !isInteractingWithPreview && setHoveredMessageId(null)
+              !isInteractingWithPreview && !isTouchDevice() && setHoveredMessageId(null)
             }
+            onTouchStart={(e) => {
+              // Only show hover buttons on touch if not touching a link preview
+              if (!isInteractingWithPreview && isTouchDevice()) {
+                const target = e.target as HTMLElement;
+                const isLinkPreview = target.closest('[data-link-preview]');
+                if (!isLinkPreview) {
+                  e.preventDefault();
+                  setHoveredMessageId(messageKey);
+                }
+              }
+            }}
           >
             <motion.div
               layout="position"
@@ -771,93 +808,95 @@ function ChatMessagesContent({
               )}
             </motion.div>
 
-            <motion.div
-              layout="position"
-              initial={{
-                backgroundColor:
-                  message.role === "user"
-                    ? "#fef9c3"
-                    : message.role === "assistant"
-                    ? "#dbeafe"
-                    : // For human messages, convert bg-color-100 to hex (approximately)
-                    bgColorClass.split(" ")[0].includes("pink")
-                    ? "#fce7f3"
-                    : bgColorClass.split(" ")[0].includes("purple")
-                    ? "#f3e8ff"
-                    : bgColorClass.split(" ")[0].includes("indigo")
-                    ? "#e0e7ff"
-                    : bgColorClass.split(" ")[0].includes("teal")
-                    ? "#ccfbf1"
-                    : bgColorClass.split(" ")[0].includes("lime")
-                    ? "#ecfccb"
-                    : bgColorClass.split(" ")[0].includes("amber")
-                    ? "#fef3c7"
-                    : bgColorClass.split(" ")[0].includes("cyan")
-                    ? "#cffafe"
-                    : bgColorClass.split(" ")[0].includes("rose")
-                    ? "#ffe4e6"
-                    : "#f3f4f6", // gray-100 fallback
-                color: "#000000",
-              }}
-              animate={
-                isUrgentMessage(message.content)
-                  ? {
-                      backgroundColor: [
-                        "#fee2e2", // Start with red for urgent (lighter red-100)
-                        message.role === "user"
-                          ? "#fef9c3"
-                          : message.role === "assistant"
-                          ? "#dbeafe"
-                          : // For human messages, convert bg-color-100 to hex (approximately)
-                          bgColorClass.split(" ")[0].includes("pink")
-                          ? "#fce7f3"
-                          : bgColorClass.split(" ")[0].includes("purple")
-                          ? "#f3e8ff"
-                          : bgColorClass.split(" ")[0].includes("indigo")
-                          ? "#e0e7ff"
-                          : bgColorClass.split(" ")[0].includes("teal")
-                          ? "#ccfbf1"
-                          : bgColorClass.split(" ")[0].includes("lime")
-                          ? "#ecfccb"
-                          : bgColorClass.split(" ")[0].includes("amber")
-                          ? "#fef3c7"
-                          : bgColorClass.split(" ")[0].includes("cyan")
-                          ? "#cffafe"
-                          : bgColorClass.split(" ")[0].includes("rose")
-                          ? "#ffe4e6"
-                          : "#f3f4f6", // gray-100 fallback
-                      ],
-                      color: ["#C92D2D", "#000000"],
-                      transition: {
-                        duration: 1,
-                        repeat: 1,
-                        repeatType: "reverse",
-                        ease: "easeInOut",
-                        delay: 0,
-                      },
-                    }
-                  : {}
-              }
-              className={`${
-                // Apply dynamic font size here
-                `p-1.5 px-2 ${
-                  bgColorClass ||
-                  (message.role === "user"
-                    ? "bg-yellow-100 text-black"
-                    : "bg-blue-100 text-black")
-                } ${
-                  isHtmlCodeBlock(message.content).isHtml ||
-                  message.parts?.some(
-                    (part) =>
-                      part.type === "text" &&
-                      extractHtmlContent(part.text).hasHtml
-                  )
-                    ? "w-full"
-                    : "w-fit max-w-[90%]"
-                }`
-              } min-h-[12px] rounded leading-snug font-geneva-12 break-words select-text`}
-              style={{ fontSize: `${fontSize}px` }} // Apply font size via style prop
-            >
+            {/* Only show message bubble if it's not a URL-only message */}
+            {!isUrlOnly(displayContent) && (
+              <motion.div
+                layout="position"
+                initial={{
+                  backgroundColor:
+                    message.role === "user"
+                      ? "#fef9c3"
+                      : message.role === "assistant"
+                      ? "#dbeafe"
+                      : // For human messages, convert bg-color-100 to hex (approximately)
+                      bgColorClass.split(" ")[0].includes("pink")
+                      ? "#fce7f3"
+                      : bgColorClass.split(" ")[0].includes("purple")
+                      ? "#f3e8ff"
+                      : bgColorClass.split(" ")[0].includes("indigo")
+                      ? "#e0e7ff"
+                      : bgColorClass.split(" ")[0].includes("teal")
+                      ? "#ccfbf1"
+                      : bgColorClass.split(" ")[0].includes("lime")
+                      ? "#ecfccb"
+                      : bgColorClass.split(" ")[0].includes("amber")
+                      ? "#fef3c7"
+                      : bgColorClass.split(" ")[0].includes("cyan")
+                      ? "#cffafe"
+                      : bgColorClass.split(" ")[0].includes("rose")
+                      ? "#ffe4e6"
+                      : "#f3f4f6", // gray-100 fallback
+                  color: "#000000",
+                }}
+                animate={
+                  isUrgentMessage(message.content)
+                    ? {
+                        backgroundColor: [
+                          "#fee2e2", // Start with red for urgent (lighter red-100)
+                          message.role === "user"
+                            ? "#fef9c3"
+                            : message.role === "assistant"
+                            ? "#dbeafe"
+                            : // For human messages, convert bg-color-100 to hex (approximately)
+                            bgColorClass.split(" ")[0].includes("pink")
+                            ? "#fce7f3"
+                            : bgColorClass.split(" ")[0].includes("purple")
+                            ? "#f3e8ff"
+                            : bgColorClass.split(" ")[0].includes("indigo")
+                            ? "#e0e7ff"
+                            : bgColorClass.split(" ")[0].includes("teal")
+                            ? "#ccfbf1"
+                            : bgColorClass.split(" ")[0].includes("lime")
+                            ? "#ecfccb"
+                            : bgColorClass.split(" ")[0].includes("amber")
+                            ? "#fef3c7"
+                            : bgColorClass.split(" ")[0].includes("cyan")
+                            ? "#cffafe"
+                            : bgColorClass.split(" ")[0].includes("rose")
+                            ? "#ffe4e6"
+                            : "#f3f4f6", // gray-100 fallback
+                        ],
+                        color: ["#C92D2D", "#000000"],
+                        transition: {
+                          duration: 1,
+                          repeat: 1,
+                          repeatType: "reverse",
+                          ease: "easeInOut",
+                          delay: 0,
+                        },
+                      }
+                    : {}
+                }
+                className={`${
+                  // Apply dynamic font size here
+                  `p-1.5 px-2 ${
+                    bgColorClass ||
+                    (message.role === "user"
+                      ? "bg-yellow-100 text-black"
+                      : "bg-blue-100 text-black")
+                  } ${
+                    isHtmlCodeBlock(message.content).isHtml ||
+                    message.parts?.some(
+                      (part) =>
+                        part.type === "text" &&
+                        extractHtmlContent(part.text).hasHtml
+                    )
+                      ? "w-full"
+                      : "w-fit max-w-[90%]"
+                  }`
+                } min-h-[12px] rounded leading-snug font-geneva-12 break-words select-text`}
+                style={{ fontSize: `${fontSize}px` }} // Apply font size via style prop
+              >
               {message.role === "assistant" ? (
                 <motion.div className="select-text flex flex-col gap-1">
                   {message.parts?.map((part, partIndex) => {
@@ -1034,6 +1073,37 @@ function ChatMessagesContent({
                         return null;
                     }
                   })}
+                  
+                  {/* Link Previews for Assistant Messages */}
+                  {(() => {
+                    const allUrls = new Set<string>();
+                    message.parts?.forEach(part => {
+                      if (part.type === "text") {
+                        const partContent = isUrgentMessage(part.text) 
+                          ? part.text.slice(4).trimStart() 
+                          : part.text;
+                        const decodedContent = decodeHtmlEntities(partContent);
+                        const { textContent } = extractHtmlContent(decodedContent);
+                        if (textContent) {
+                          extractUrls(textContent).forEach(url => allUrls.add(url));
+                        }
+                      }
+                    });
+                    
+                    if (allUrls.size === 0) return null;
+                    
+                    return (
+                      <div className="flex flex-col gap-2 mt-2 w-full">
+                        {Array.from(allUrls).map((url, index) => (
+                          <LinkPreview
+                            key={`${messageKey}-assistant-link-${index}`}
+                            url={url}
+                            className="w-full"
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               ) : (
                 <>
@@ -1108,6 +1178,27 @@ function ChatMessagesContent({
                 </>
               )}
             </motion.div>
+            )}
+            
+            {/* Link Previews - Only for non-assistant messages */}
+            {message.role !== "assistant" && (() => {
+              const urls = extractUrls(displayContent);
+              if (urls.length === 0) return null;
+              
+              return (
+                <div className={`flex flex-col gap-2 max-w-[90%] ${
+                  isUrlOnly(displayContent) ? "mt-0" : "mt-2"
+                }`}>
+                  {urls.map((url, index) => (
+                    <LinkPreview
+                      key={`${messageKey}-link-${index}`}
+                      url={url}
+                      className="w-full"
+                    />
+                  ))}
+                </div>
+              );
+            })()}
           </motion.div>
         );
       })}

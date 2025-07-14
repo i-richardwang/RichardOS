@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { Redis } from "@upstash/redis";
@@ -163,10 +163,10 @@ Your task is to translate the "words" for each line into ${targetLanguage}.
 Respond ONLY with a valid JSON object containing a single key "translatedTexts". The value of "translatedTexts" MUST be an array of strings.
 This array should contain only the translated versions of the "words" from the input, in the exact same order as they appeared in the input array.
 If a line is purely instrumental or cannot be translated (e.g., "---"), return its original "words" text.
-Do not include timestamps or any other formatting in your output strings; just the raw translated text for each line.`;
+Do not include timestamps or any other formatting in your output strings; just the raw translated text for each line. Do not use , . ! ? : ; `;
 
     const { object: aiResponse } = await generateObject({
-      model: openai("gpt-4.1-mini"),
+      model: google("gemini-2.5-flash"),
       schema: AiTranslatedTextsSchema, // Use the new simplified schema for AI output
       prompt: JSON.stringify(lines.map((line) => ({ words: line.words }))), // Send only words to AI for translation context
       system: systemPrompt,

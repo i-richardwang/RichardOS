@@ -9,6 +9,7 @@ import { getWindowConfig } from "@/config/appRegistry";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { AppId } from "@/config/appIds";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIsPhone } from "@/hooks/useIsPhone";
 import { useAppStoreShallow } from "@/stores/helpers";
 
 interface WindowFrameProps {
@@ -91,6 +92,7 @@ export function WindowFrame({
   const [isMaximized, setIsMaximized] = useState(false);
   const isClosingRef = useRef(false);
   const isMobile = useIsMobile();
+  const isPhone = useIsPhone();
   const lastTapTimeRef = useRef<number>(0);
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingTapRef = useRef(false);
@@ -98,7 +100,7 @@ export function WindowFrame({
   // Keep track of window size before maximizing to restore it later
   const previousSizeRef = useRef({ width: 0, height: 0 });
 
-  // Setup swipe navigation for mobile
+  // Setup swipe navigation for phones only
   const {
     handleTouchStart,
     handleTouchMove,
@@ -107,7 +109,7 @@ export function WindowFrame({
     swipeDirection,
   } = useSwipeNavigation({
     currentAppId: appId as AppId,
-    isActive: isMobile && isForeground,
+    isActive: isPhone && isForeground,
     onSwipeLeft: () => {
       playWindowMoveStop();
       vibrateSwap();
@@ -492,7 +494,7 @@ export function WindowFrame({
 
   // Calculate dynamic style for swipe animation feedback
   const getSwipeStyle = () => {
-    if (!isMobile || !isSwiping || !swipeDirection) {
+    if (!isPhone || !isSwiping || !swipeDirection) {
       return {};
     }
 
@@ -546,7 +548,7 @@ export function WindowFrame({
           {/* Top resize handle */}
           <div
             className={cn(
-              "absolute left-1 right-0 cursor-n-resize pointer-events-auto transition-[top,height] select-none",
+              "absolute left-1 right-0 cursor-n-resize pointer-events-auto transition-[top,height] select-none resize-handle",
               debugMode && "bg-red-500/50",
               resizeType?.includes("n")
                 ? "top-[-100px] h-[200px]"
@@ -566,7 +568,7 @@ export function WindowFrame({
           {/* Bottom resize handle */}
           <div
             className={cn(
-              "absolute left-0 right-0 cursor-s-resize pointer-events-auto transition-[bottom,height] select-none",
+              "absolute left-0 right-0 cursor-s-resize pointer-events-auto transition-[bottom,height] select-none resize-handle",
               debugMode && "bg-red-500/50",
               resizeType?.includes("s")
                 ? "bottom-[-100px] h-[200px]"
@@ -586,7 +588,7 @@ export function WindowFrame({
           {/* Left resize handle */}
           <div
             className={cn(
-              "absolute top-3 cursor-w-resize pointer-events-auto transition-[left,width] select-none",
+              "absolute top-3 cursor-w-resize pointer-events-auto transition-[left,width] select-none resize-handle",
               debugMode && "bg-red-500/50",
               resizeType?.includes("w")
                 ? "left-[-100px] w-[200px]"
@@ -604,7 +606,7 @@ export function WindowFrame({
           {/* Right resize handle */}
           <div
             className={cn(
-              "absolute top-6 cursor-e-resize pointer-events-auto transition-[right,width] select-none",
+              "absolute top-6 cursor-e-resize pointer-events-auto transition-[right,width] select-none resize-handle",
               debugMode && "bg-red-500/50",
               resizeType?.includes("e")
                 ? "right-[-100px] w-[200px]"
@@ -622,7 +624,7 @@ export function WindowFrame({
           {/* Corner resize handles */}
           <div
             className={cn(
-              "absolute cursor-ne-resize pointer-events-auto transition-all select-none",
+              "absolute cursor-ne-resize pointer-events-auto transition-all select-none resize-handle",
               debugMode && "bg-red-500/50",
               isMobile && "hidden",
               resizeType === "ne"
@@ -639,7 +641,7 @@ export function WindowFrame({
 
           <div
             className={cn(
-              "absolute cursor-sw-resize pointer-events-auto transition-all select-none",
+              "absolute cursor-sw-resize pointer-events-auto transition-all select-none resize-handle",
               debugMode && "bg-red-500/50",
               isMobile && "hidden",
               resizeType === "sw"
@@ -656,7 +658,7 @@ export function WindowFrame({
 
           <div
             className={cn(
-              "absolute cursor-se-resize pointer-events-auto transition-all select-none",
+              "absolute cursor-se-resize pointer-events-auto transition-all select-none resize-handle",
               debugMode && "bg-red-500/50",
               isMobile && "hidden",
               resizeType === "se"
@@ -683,7 +685,7 @@ export function WindowFrame({
           {/* Title bar */}
           <div
             className={cn(
-              "flex items-center shrink-0 h-6 min-h-6 mx-0 my-[0.1rem] mb-0 px-[0.1rem] py-[0.2rem] select-none cursor-move border-b-[1.5px] user-select-none z-50",
+              "flex items-center shrink-0 h-6 min-h-6 mx-0 my-[0.1rem] mb-0 px-[0.1rem] py-[0.2rem] select-none cursor-move border-b-[1.5px] user-select-none z-50 draggable-area",
               transparentBackground && "mt-0 h-6.5",
               isForeground
                 ? transparentBackground
@@ -696,17 +698,17 @@ export function WindowFrame({
             onMouseDown={handleMouseDownWithForeground}
             onTouchStart={(e: React.TouchEvent<HTMLElement>) => {
               handleMouseDownWithForeground(e);
-              if (isMobile) {
+              if (isPhone) {
                 handleTouchStart(e);
               }
             }}
             onTouchMove={(e: React.TouchEvent<HTMLElement>) => {
-              if (isMobile) {
+              if (isPhone) {
                 handleTouchMove(e);
               }
             }}
             onTouchEnd={() => {
-              if (isMobile) {
+              if (isPhone) {
                 handleTouchEnd();
               }
             }}

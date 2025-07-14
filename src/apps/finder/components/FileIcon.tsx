@@ -1,5 +1,7 @@
 import { useSound, Sounds } from "@/hooks/useSound";
 import { useEffect, useState, useRef } from "react";
+import { isMobileDevice } from "@/utils/device";
+import { useLongPress } from "@/hooks/useLongPress";
 
 interface FileIconProps {
   name: string;
@@ -8,6 +10,7 @@ interface FileIconProps {
   content?: string | Blob;
   contentUrl?: string;
   onDoubleClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
   isSelected?: boolean;
   isDropTarget?: boolean;
   onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -22,6 +25,7 @@ export function FileIcon({
   content,
   contentUrl,
   onDoubleClick,
+  onContextMenu,
   isSelected,
   isDropTarget,
   onClick,
@@ -120,7 +124,12 @@ export function FileIcon({
   const sizes = sizeClasses[size];
 
   const handleImageError = () => {
-    console.error(`Error loading thumbnail for ${name}, fallback to icon. Current imgSrc: ${imgSrc?.substring(0, 50)}...`);
+    console.error(
+      `Error loading thumbnail for ${name}, fallback to icon. Current imgSrc: ${imgSrc?.substring(
+        0,
+        50
+      )}...`
+    );
 
     // If we have a Blob but URL failed, try regenerating URL one time
     if (
@@ -141,7 +150,12 @@ export function FileIcon({
         const newUrl = URL.createObjectURL(contentRef.current);
         blobUrlRef.current = newUrl;
         setImgSrc(newUrl);
-        console.log(`[FileIcon] Created new URL for ${name}: ${newUrl.substring(0, 50)}...`);
+        console.log(
+          `[FileIcon] Created new URL for ${name}: ${newUrl.substring(
+            0,
+            50
+          )}...`
+        );
         return;
       }
     }
@@ -173,7 +187,9 @@ export function FileIcon({
       <img
         src={getIconPath()}
         alt={isDirectory ? "Directory" : "File"}
-        className={`no-touch-callout object-contain ${sizes.image} ${isDirectory && isDropTarget ? "invert" : ""}`}
+        className={`no-touch-callout object-contain ${sizes.image} ${
+          isDirectory && isDropTarget ? "invert" : ""
+        }`}
         style={{ imageRendering: "pixelated" }}
         onContextMenu={(e) => e.preventDefault()}
         draggable={false}
@@ -181,18 +197,53 @@ export function FileIcon({
     );
   };
 
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    playClick();
+
+    // On mobile devices, single tap should open the app (execute onDoubleClick)
+    if (isMobileDevice() && onDoubleClick) {
+      onDoubleClick(e);
+    } else {
+      // On desktop, execute the regular onClick handler (selection)
+      onClick?.(e);
+    }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only handle double-click on desktop (mobile uses single tap)
+    if (!isMobileDevice()) {
+      onDoubleClick?.(e);
+    }
+  };
+
+  // Add long-press support for context menu on mobile
+  const longPressHandlers = useLongPress((touchEvent) => {
+    if (onContextMenu) {
+      const touch = touchEvent.touches[0];
+      const syntheticEvent = {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      } as unknown as React.MouseEvent<HTMLDivElement>;
+      onContextMenu(syntheticEvent);
+    }
+  });
+
   return (
     <div
-      className={`flex flex-col items-center justify-start cursor-pointer gap-1 ${sizes.container} ${className}`}
-      onDoubleClick={onDoubleClick}
-      onClick={(e) => {
-        playClick();
-        onClick?.(e);
-      }}
+      className={`flex flex-col items-center justify-start cursor-default gap-1 ${sizes.container} ${className}`}
+      onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
+      onContextMenu={onContextMenu}
+      data-desktop-icon="true"
+      {...longPressHandlers}
     >
       <div
         className={`flex items-center justify-center ${sizes.icon} ${
-          isSelected || (isDropTarget && isDirectory) ? "brightness-65 contrast-100" : ""
+          isSelected || (isDropTarget && isDirectory)
+            ? "brightness-65 contrast-100"
+            : ""
         }`}
       >
         {renderIcon()}
@@ -200,7 +251,11 @@ export function FileIcon({
       <span
         className={`text-center px-1 font-geneva-12 break-words truncate ${
           sizes.text
-        } ${isSelected || (isDropTarget && isDirectory) ? "bg-black text-white" : "bg-white text-black"}`}
+        } ${
+          isSelected || (isDropTarget && isDirectory)
+            ? "bg-black text-white"
+            : "bg-white text-black"
+        }`}
       >
         {name}
       </span>
