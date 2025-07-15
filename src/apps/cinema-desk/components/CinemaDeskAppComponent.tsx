@@ -27,7 +27,7 @@ interface CinemaData {
   monthlyRecommendations: MonthlyRecommendation[];
 }
 
-// 常量定义
+// Style constants
 const STYLES = {
   BADGE_LARGE: "text-[9px] h-5 px-2 py-1 font-geneva-12 flex items-center",
   BADGE_SMALL: "text-[8px] h-5 px-1.5 py-1 font-geneva-12 flex items-center",
@@ -42,11 +42,11 @@ const ICON_SIZES = {
   STAR_SMALL: "w-2.5 h-2.5",
 } as const;
 
-// 工具函数
+// Utility functions
 const getTypeIcon = (type: string, size: keyof typeof ICON_SIZES = "TYPE_LARGE") => {
   const iconClass = ICON_SIZES[size];
-  return type === "movie" 
-    ? <Film className={iconClass} /> 
+  return type === "movie"
+    ? <Film className={iconClass} />
     : <Monitor className={iconClass} />;
 };
 
@@ -57,18 +57,18 @@ const formatMonthYear = (monthString: string) => {
   });
 };
 
-// 评分渲染组件
-const StarRating = ({ 
-  rating, 
-  size = "STAR_LARGE" 
-}: { 
-  rating: number; 
+// Star rating component
+const StarRating = ({
+  rating,
+  size = "STAR_LARGE"
+}: {
+  rating: number;
   size?: keyof typeof ICON_SIZES;
 }) => {
   const stars = Math.floor(rating / 2);
   const halfStar = rating % 2 >= 1;
   const iconClass = ICON_SIZES[size];
-  
+
   return (
     <div className="flex items-center">
       {[...Array(stars)].map((_, i) => (
@@ -84,12 +84,12 @@ const StarRating = ({
   );
 };
 
-// 推荐卡片组件
-const RecommendationCard = ({ 
-  recommendation, 
-  onPrev, 
-  onNext, 
-  canNavigatePrev, 
+// Recommendation card component
+const RecommendationCard = ({
+  recommendation,
+  onPrev,
+  onNext,
+  canNavigatePrev,
   canNavigateNext,
   currentDisplayOrder,
   totalCount
@@ -104,19 +104,19 @@ const RecommendationCard = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   const monthYear = formatMonthYear(recommendation.recommendedMonth);
-  
-  // 当推荐内容变化时重置图片错误状态
+
+  // Reset image error state when recommendation changes
   useEffect(() => {
     setImageError(false);
   }, [recommendation.id]);
-  
+
   return (
     <div className={`bg-white h-full flex flex-col relative ${STYLES.CARD_BORDER}`}>
-      {/* 海报区域 */}
+      {/* Poster area */}
       <div className="relative flex-1 bg-[#f0f0f0] overflow-hidden">
         {!imageError ? (
-          <img 
-            src={recommendation.posterUrl} 
+          <img
+            src={recommendation.posterUrl}
             alt={recommendation.title}
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
@@ -126,7 +126,7 @@ const RecommendationCard = ({
             <Film className="w-16 h-16 text-gray-400" />
           </div>
         )}
-        {/* 标签容器 */}
+        {/* Badge container */}
         <div className="absolute inset-0 p-3">
           <div className="flex justify-between items-start h-5">
             <Badge variant="retro" className={STYLES.BADGE_LARGE}>
@@ -139,8 +139,8 @@ const RecommendationCard = ({
           </div>
         </div>
       </div>
-      
-      {/* 信息区域 */}
+
+      {/* Information area */}
       <div className="p-3 bg-white">
         <h2 className="font-geneva-12 text-xl font-bold mb-2 text-black">
           {recommendation.title}
@@ -148,23 +148,23 @@ const RecommendationCard = ({
         <p className="font-geneva-12 text-sm text-gray-600 mb-3">
           {recommendation.year} • {recommendation.director}
         </p>
-        
-        {/* 评分 */}
+
+        {/* Rating */}
         <div className="flex items-center gap-3 mb-3">
           <StarRating rating={recommendation.imdbRating} />
           <span className="font-geneva-12 text-sm text-orange-600 font-bold">
             {recommendation.imdbRating}/10
           </span>
         </div>
-        
-        {/* 经典台词 */}
+
+        {/* Classic quote */}
         <p className="font-geneva-12 text-sm text-gray-700 mb-3 leading-relaxed min-h-[3rem] italic">
           "{recommendation.classicQuote}"
         </p>
-        
+
       </div>
-      
-      {/* 导航按钮区域 */}
+
+      {/* Navigation buttons area */}
       <div className="p-3 bg-white border-t border-gray-200 flex justify-center gap-4">
         <Button
           onClick={onPrev}
@@ -175,11 +175,11 @@ const RecommendationCard = ({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        
+
         <span className="font-geneva-12 text-sm text-gray-600 self-center">
           {currentDisplayOrder} / {totalCount}
         </span>
-        
+
         <Button
           onClick={onNext}
           disabled={!canNavigateNext}
@@ -194,28 +194,28 @@ const RecommendationCard = ({
   );
 };
 
-// 小卡片组件
+// Small movie card component
 const MovieCard = ({ item, onClick }: { item: MonthlyRecommendation; onClick: () => void }) => {
   const [imageError, setImageError] = useState(false);
   const monthYear = formatMonthYear(item.recommendedMonth);
-  
-  // 当内容变化时重置图片错误状态
+
+  // Reset image error state when content changes
   useEffect(() => {
     setImageError(false);
   }, [item.id]);
-  
+
   return (
     <div
       key={item.id}
       onClick={onClick}
       className={`bg-white ${STYLES.CARD_BORDER} p-3 hover:bg-gray-50 transition-colors cursor-pointer font-geneva-12`}
     >
-      {/* 缩略图区域 */}
+      {/* Thumbnail area */}
       <div className="relative mb-2">
         <div className={`w-full aspect-[2/3] bg-[#f0f0f0] ${STYLES.SMALL_CARD_BORDER} overflow-hidden relative`}>
           {!imageError ? (
-            <img 
-              src={item.thumbnailUrl} 
+            <img
+              src={item.thumbnailUrl}
               alt={item.title}
               className="w-full h-full object-cover"
               onError={() => setImageError(true)}
@@ -232,21 +232,21 @@ const MovieCard = ({ item, onClick }: { item: MonthlyRecommendation; onClick: ()
           </Badge>
         </div>
       </div>
-      
-      {/* 标题 */}
+
+      {/* Title */}
       <h3 className="font-geneva-12 font-bold text-xs mb-1 line-clamp-2 text-black leading-tight min-h-[32px] flex items-start">
         {item.title}
       </h3>
       <p className="font-geneva-12 text-[10px] text-gray-600 mb-1 truncate">
         {item.year}
       </p>
-      
-      {/* 推荐月份 */}
+
+      {/* Recommended month */}
       <p className="font-geneva-12 text-[9px] text-blue-600 mb-2 truncate">
         {monthYear}
       </p>
-      
-      {/* 评分 */}
+
+      {/* Rating */}
       <div className="flex items-center">
         <StarRating rating={item.imdbRating} size="STAR_SMALL" />
       </div>
@@ -272,7 +272,7 @@ export function CinemaDeskAppComponent({
   const [loading, setLoading] = useState(true);
   const [currentDisplayOrder, setCurrentDisplayOrder] = useState(1);
 
-  // 加载影视数据
+  // Load cinema data
   useEffect(() => {
     const loadCinemaData = async () => {
       try {
@@ -289,48 +289,48 @@ export function CinemaDeskAppComponent({
     loadCinemaData();
   }, []);
 
-  // 初始显示序号1（最新推荐）
+  // Initial display order 1 (latest recommendation)
   useEffect(() => {
     if (cinemaData.monthlyRecommendations.length > 0 && currentDisplayOrder === 1) {
-      // 保持初始状态为1，对应最新推荐
+      // Keep initial state as 1, corresponding to the latest recommendation
     }
   }, [cinemaData.monthlyRecommendations.length, currentDisplayOrder]);
 
-  // 计算导航状态
+  // Calculate navigation state
   const navigationState = useMemo(() => {
     const totalCount = cinemaData.monthlyRecommendations.length;
     if (totalCount === 0) {
       return { canNavigatePrev: false, canNavigateNext: false, currentRecommendation: null, arrayIndex: 0 };
     }
-    
-    // 显示序号1对应数组最后一个（最新），显示序号N对应数组第一个（最旧）
+
+    // Display order 1 corresponds to the last array item (newest), display order N corresponds to the first array item (oldest)
     const arrayIndex = totalCount - currentDisplayOrder;
-    const canNavigatePrev = currentDisplayOrder > 1; // 可以往左（到更早的序号）
-    const canNavigateNext = currentDisplayOrder < totalCount; // 可以往右（到更晚的序号）
+    const canNavigatePrev = currentDisplayOrder > 1; // Can go left (to earlier order)
+    const canNavigateNext = currentDisplayOrder < totalCount; // Can go right (to later order)
     const currentRecommendation = cinemaData.monthlyRecommendations[arrayIndex];
-    
+
     return { canNavigatePrev, canNavigateNext, currentRecommendation, arrayIndex };
   }, [currentDisplayOrder, cinemaData.monthlyRecommendations]);
 
-  // 导航处理
+  // Navigation handlers
   const handlePrevRecommendation = () => {
     if (navigationState.canNavigatePrev) {
-      setCurrentDisplayOrder(prev => prev - 1); // 往左是更早的序号
-    }
-  };
-  
-  const handleNextRecommendation = () => {
-    if (navigationState.canNavigateNext) {
-      setCurrentDisplayOrder(prev => prev + 1); // 往右是更晚的序号
+      setCurrentDisplayOrder(prev => prev - 1); // Left is earlier order
     }
   };
 
-  // 处理小卡片点击，切换到对应的推荐
+  const handleNextRecommendation = () => {
+    if (navigationState.canNavigateNext) {
+      setCurrentDisplayOrder(prev => prev + 1); // Right is later order
+    }
+  };
+
+  // Handle small card click, switch to corresponding recommendation
   const handleCardClick = (item: MonthlyRecommendation) => {
-    // 找到该作品在 monthlyRecommendations 数组中的索引
+    // Find the index of this item in the monthlyRecommendations array
     const arrayIndex = cinemaData.monthlyRecommendations.findIndex(rec => rec.id === item.id);
     if (arrayIndex !== -1) {
-      // 计算对应的显示序号：数组最后一个是序号1，数组第一个是序号N
+      // Calculate corresponding display order: last array item is order 1, first array item is order N
       const displayOrder = cinemaData.monthlyRecommendations.length - arrayIndex;
       setCurrentDisplayOrder(displayOrder);
     }
@@ -354,7 +354,7 @@ export function CinemaDeskAppComponent({
         onNavigateNext={onNavigateNext}
         onNavigatePrevious={onNavigatePrevious}
       >
-        <div className="flex h-full w-full bg-white">
+        <div className="flex flex-col md:flex-row md:h-full w-full bg-white overflow-auto md:overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center w-full h-full">
               <div className="text-center text-black font-geneva-12">
@@ -364,8 +364,8 @@ export function CinemaDeskAppComponent({
             </div>
           ) : (
             <>
-              {/* 左侧推荐区域 */}
-              <div className="w-1/2 p-4">
+              {/* Featured recommendation area - full width on mobile, top position */}
+              <div className="w-full md:w-1/2 p-4 flex-shrink-0 md:h-full md:overflow-auto">
                 {navigationState.currentRecommendation && (
                   <RecommendationCard
                     recommendation={navigationState.currentRecommendation}
@@ -378,19 +378,19 @@ export function CinemaDeskAppComponent({
                   />
                 )}
               </div>
-              
-              {/* 右侧推荐历史列表 */}
-              <div className="w-1/2 bg-[#f5f5f5] border-l border-black flex flex-col">
-                {/* 标题栏 */}
-                <div className="bg-[#c0c0c0] border-b border-black px-4 py-2">
+
+              {/* Recommendation history list - below on mobile */}
+              <div className="w-full md:w-1/2 bg-[#f5f5f5] border-t md:border-t-0 md:border-l border-black flex flex-col md:h-full">
+                {/* Title bar */}
+                <div className="bg-[#c0c0c0] border-b border-black px-4 py-2 flex-shrink-0">
                   <h3 className="font-geneva-12 text-sm font-bold text-black">
                     Monthly Recommendations
                   </h3>
                 </div>
-                
-                {/* 推荐历史列表 */}
+
+                {/* Recommendation history list */}
                 <div className="flex-1 overflow-y-auto p-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4 md:pb-0">
                     {[...cinemaData.monthlyRecommendations].reverse().map(item => (
                       <MovieCard key={item.id} item={item} onClick={() => handleCardClick(item)} />
                     ))}

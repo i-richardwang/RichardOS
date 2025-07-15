@@ -21,7 +21,7 @@ const DISABLED_MENU_ITEM_CLASS = `${MENU_ITEM_CLASS} disabled:opacity-50 disable
 const MENU_SEPARATOR_CLASS = "h-[2px] bg-black my-1";
 
 export function CinemaDeskMenuBar({
-  onClose: _onClose, // 保留以符合接口，但暂时未使用
+  onClose: _onClose, // Kept to match interface, but not used currently
   isWindowOpen,
   onShowHelp,
   onShowAbout,

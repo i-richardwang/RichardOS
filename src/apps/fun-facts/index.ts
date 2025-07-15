@@ -32,13 +32,13 @@ export const appMetadata = {
     url: "https://github.com/i-richardwang",
   },
   github: "https://github.com/i-richardwang/RichardOS",
-  icon: "/icons/question.png",
+  icon: "/icons/fun-facts.png",
 };
 
 export const FunFactsApp: BaseApp = {
   id: "fun-facts",
   name: "Fun Facts",
-  icon: { type: "image", src: "/icons/question.png" },
+  icon: { type: "image", src: "/icons/fun-facts.png" },
   description: "Discover interesting personal facts and stories in a fun, interactive way",
   component: FunFactsAppComponent,
   helpItems,

@@ -1,7 +1,7 @@
 import { CinemaDeskAppComponent } from "./components/CinemaDeskAppComponent";
 import type { BaseApp } from "../base/types";
 
-// 帮助项目（显示在帮助对话框中）
+// Help items (displayed in help dialog)
 export const helpItems = [
   {
     icon: "🎬",
@@ -35,7 +35,7 @@ export const helpItems = [
   },
 ];
 
-// 应用元数据（显示在关于对话框中）
+// App metadata (displayed in about dialog)
 export const appMetadata = {
   name: "CinemaDesk",
   version: "1.0.0",
@@ -47,7 +47,7 @@ export const appMetadata = {
   icon: "/icons/cinema-desk.png",
 };
 
-// 应用配置对象
+// App configuration object
 export const CinemaDeskApp: BaseApp = {
   id: "cinema-desk",
   name: "CinemaDesk",

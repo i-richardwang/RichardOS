@@ -6,7 +6,7 @@ import { HelpDialog } from "@/components/dialogs/HelpDialog";
 import { AboutDialog } from "@/components/dialogs/AboutDialog";
 import { helpItems, appMetadata } from "../index";
 import { Button } from "@/components/ui/button";
-import { Shuffle, Star } from "lucide-react";
+import { Dice3, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -145,19 +145,16 @@ export function FunFactsAppComponent({
                       "w-full max-w-md md:max-w-lg mx-auto p-4 md:p-6 text-center font-geneva-12",
                       "border-[5px] border-solid border-transparent",
                       "[border-image:url('/button.svg')_30_stretch]",
+                      "min-h-[280px] md:min-h-[320px] flex flex-col justify-center",
                       getCategoryColor(currentFact.category)
                     )}>
                       <div className="text-3xl md:text-4xl mb-3 md:mb-4">{currentFact.icon}</div>
                       <h3 className="text-base md:text-lg text-black mb-3 md:mb-4 font-bold">
                         {currentFact.title}
                       </h3>
-                      <p className="text-black text-[13px] md:text-[14px] leading-relaxed mb-3 md:mb-4">
+                      <p className="text-black text-[13px] md:text-[14px] leading-relaxed">
                         {currentFact.content}
                       </p>
-                      <div className="inline-flex items-center px-2 py-1 text-[10px] bg-white bg-opacity-70 text-gray-600 border border-gray-300">
-                        <Star className="w-3 h-3 mr-1" />
-                        {currentFact.category}
-                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -175,8 +172,8 @@ export function FunFactsAppComponent({
                     "active:translate-y-0.5"
                   )}
                 >
-                  <Shuffle className="w-4 h-4" />
-                  <span>Next Fact</span>
+                  <Dice3 className="w-4 h-4" />
+                  <span>Roll the Dice</span>
                 </Button>
               </div>
             </div>

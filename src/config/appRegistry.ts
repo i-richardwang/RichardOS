@@ -155,7 +155,7 @@ export const appRegistry = {
     ...ProjectsApp,
     windowConfig: {
       defaultSize: { width: 800, height: 600 },
-      minSize: { width: 600, height: 400 },
+      minSize: { width: 700, height: 400 },
     } as WindowConstraints,
   },
   [BlogApp.id]: {

@@ -23,7 +23,7 @@ function ProjectCard({
       className={cn(
         "group relative bg-system7-window-bg p-3 font-geneva-12 cursor-pointer",
         "border-[5px] border-solid border-transparent [border-image:url('/button.svg')_30_stretch]",
-        "flex flex-col min-h-[200px]"
+        "flex flex-col min-h-[240px] h-full w-full"
       )}
       onClick={onClick}
     >
@@ -177,26 +177,28 @@ export function ProjectsAppComponent({
                 </div>
               ) : (
                 <div className="p-4 space-y-6">
-                  {/* Projects grouped by category */}
-                  {sortedCategories.map((category) => (
-                    <div key={category}>
-                      <h2 className="font-geneva-12 text-[18px] font-bold mb-3 text-black flex items-center gap-2">
-                        {projectsByCategory[category].some(p => p.featured) && (
-                          <Star className="w-4 h-4 fill-black text-black" />
-                        )}
-                        {getCategoryDisplayName(category)}
-                      </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {projectsByCategory[category].map((project) => (
-                          <ProjectCard
-                            key={project.id}
-                            project={project}
-                            onClick={() => handleProjectClick(project)}
-                          />
-                        ))}
+                  <div className="max-w-4xl mx-auto">
+                    {/* Projects grouped by category */}
+                    {sortedCategories.map((category) => (
+                      <div key={category} className="mb-8">
+                        <h2 className="font-geneva-12 text-[18px] font-bold mb-3 text-black flex items-center gap-2">
+                          {projectsByCategory[category].some(p => p.featured) && (
+                            <Star className="w-4 h-4 fill-black text-black" />
+                          )}
+                          {getCategoryDisplayName(category)}
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {projectsByCategory[category].map((project) => (
+                            <ProjectCard
+                              key={project.id}
+                              project={project}
+                              onClick={() => handleProjectClick(project)}
+                            />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
